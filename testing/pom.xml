@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.casehub</groupId>
+        <artifactId>casehub-ops-parent</artifactId>
+        <version>0.2-SNAPSHOT</version>
+    </parent>
+    <artifactId>casehub-ops-testing</artifactId>
+    <name>CaseHub Ops :: Testing</name>
+    <description>Shared test fixtures for casehub-ops domain implementations. Test scope only.</description>
+    <dependencies>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-ops-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-desiredstate-testing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-platform-testing</artifactId>
+        </dependency>
+    </dependencies>
+</project>
