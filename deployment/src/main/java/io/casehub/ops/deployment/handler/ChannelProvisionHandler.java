@@ -20,7 +20,7 @@ import io.casehub.qhorus.runtime.channel.ChannelService;
 @ApplicationScoped
 public class ChannelProvisionHandler {
 
-    interface ChannelOperations {
+    public interface ChannelOperations {
         Optional<Channel> findByName(String name);
         Channel create(ChannelCreateRequest req);
         void delete(UUID channelId, boolean force);
@@ -45,7 +45,7 @@ public class ChannelProvisionHandler {
         };
     }
 
-    ChannelProvisionHandler(ChannelOperations ops) {
+    public ChannelProvisionHandler(ChannelOperations ops) {
         this.ops = ops;
     }
 
