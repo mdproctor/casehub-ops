@@ -44,7 +44,7 @@ class DeploymentActualStateAdapterTest {
     void agentPresent() {
         var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
         var descriptor = new AgentDescriptor(
-                "agent-1", "Agent", "anthropic", "claude", "4.6", "1.0", "fp1",
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
                 List.of(cap), null, "US", "policy", TENANCY_ID);
         agentRegistry.register(descriptor);
@@ -78,7 +78,7 @@ class DeploymentActualStateAdapterTest {
         var cap2 = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of());
 
         var descriptor = new AgentDescriptor(
-                "agent-1", "Agent", "anthropic", "claude", "4.6", "1.0", "fp1",
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
                 List.of(cap1), null, "US", "policy", TENANCY_ID);
         agentRegistry.register(descriptor);
