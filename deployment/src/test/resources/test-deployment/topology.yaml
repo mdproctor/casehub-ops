@@ -1,0 +1,26 @@
+agents:
+  - spec:
+      agentId: test-agent
+      name: Test Agent
+      slot: worker
+    dependsOn: []
+channels:
+  - spec:
+      name: test/work
+      semantic: APPEND
+    dependsOn: []
+caseTypes:
+  - spec:
+      namespace: io.test
+      name: test-case
+      version: "1.0"
+    dependsOn: []
+trust:
+  - spec:
+      capability: review
+      threshold: 0.7
+      minimumObservations: 5
+      borderlineMargin: 0.1
+      blendFactor: 0.5
+      bootstrapEscalationRequired: false
+    dependsOn: []

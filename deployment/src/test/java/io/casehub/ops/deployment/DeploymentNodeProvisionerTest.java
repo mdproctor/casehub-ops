@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DeploymentNodeProvisionerTest {
@@ -22,22 +23,27 @@ class DeploymentNodeProvisionerTest {
     private DeploymentNodeProvisioner provisioner;
     private StubAgentRegistry agentRegistry;
     private StubChannelOperations channelOps;
+    private SpecHashStore specHashStore;
     private DesiredStateGraph emptyGraph;
 
     @BeforeEach
     void setUp() {
         agentRegistry = new StubAgentRegistry();
         channelOps = new StubChannelOperations();
+        specHashStore = new SpecHashStore();
+        var providerConfigStore = new DeploymentProviderConfigStore();
         var caseTypeHandler = new CaseTypeProvisionHandler();
         var trustProvider = new DeploymentTrustRoutingPolicyProvider();
         var trustHandler = new TrustPolicyProvisionHandler(trustProvider);
         emptyGraph = new DefaultDesiredStateGraphFactory().empty();
 
         provisioner = new DeploymentNodeProvisioner(
-                new AgentProvisionHandler(agentRegistry),
+                agentRegistry,
+                providerConfigStore,
                 new ChannelProvisionHandler(channelOps),
                 caseTypeHandler,
-                trustHandler);
+                trustHandler,
+                specHashStore);
     }
 
     @Test
@@ -45,7 +51,7 @@ class DeploymentNodeProvisionerTest {
         var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
         var disp = AgentDisposition.builder().delegation(false).build();
         var spec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
-                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy");
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy", null, List.of());
         var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
         var context = new ProvisionContext("tenant-1", emptyGraph);
 
@@ -82,6 +88,35 @@ class DeploymentNodeProvisionerTest {
         assertTrue(failed.reason().contains("not DeploymentNodeSpec"));
     }
 
+    @Test
+    void provisionRecordsSpecHash() {
+        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
+                "1.0", null, null, null, null, null, List.of(), null, null, null, null, List.of());
+        var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
+        provisioner.provision(node, new ProvisionContext("tenant-1", emptyGraph));
+        assertThat(specHashStore.hasDrifted(NodeId.of("a1"), spec)).isFalse();
+    }
+
+    @Test
+    void deprovisionRemovesSpecHash() {
+        var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
+                null, null, null, null, null, null, null, null, null, null, null);
+        var node = new DesiredNode(NodeId.of("ch1"), NodeType.of("channel"), spec, false);
+        provisioner.provision(node, new ProvisionContext("tenant-1", emptyGraph));
+        assertThat(specHashStore.hasDrifted(NodeId.of("ch1"), spec)).isFalse();
+        provisioner.deprovision(node, new DeprovisionContext("tenant-1", emptyGraph));
+        assertThat(specHashStore.hasDrifted(NodeId.of("ch1"), spec)).isTrue();
+    }
+
+    @Test
+    void failedProvisionDoesNotRecordHash() {
+        NodeSpec unknownSpec = new NodeSpec() {};
+        var node = new DesiredNode(NodeId.of("ns1"), NodeType.of("unknown"), unknownSpec, false);
+        provisioner.provision(node, new ProvisionContext("tenant-1", emptyGraph));
+        // Unknown spec causes Failed — should not record hash
+        assertThat(specHashStore.hasDrifted(NodeId.of("ns1"), unknownSpec)).isTrue();
+    }
+
     // Test stubs
     static class StubAgentRegistry implements AgentRegistry {
         final Map<String, AgentDescriptor> descriptors = new ConcurrentHashMap<>();
@@ -115,6 +150,7 @@ class DeploymentNodeProvisionerTest {
         @Override
         public Channel create(ChannelCreateRequest req) {
             Channel ch = new Channel();
+            ch.id = UUID.randomUUID();
             ch.name = req.name();
             ch.semantic = req.semantic();
             channels.put(ch.name, ch);

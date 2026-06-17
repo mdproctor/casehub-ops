@@ -3,10 +3,12 @@ package io.casehub.ops.api.deployment;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.casehub.eidos.api.AgentCapability;
 import io.casehub.eidos.api.AgentDisposition;
 import io.casehub.eidos.api.DispositionAxis;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentNodeSpec(
         String agentId,
         String name,
@@ -23,7 +25,9 @@ public record AgentNodeSpec(
         List<AgentCapability> capabilities,
         AgentDisposition disposition,
         String jurisdiction,
-        String dataHandlingPolicy
+        String dataHandlingPolicy,
+        String briefing,
+        List<ProviderConfig> providerConfigs
 ) implements DeploymentNodeSpec {
 
     public AgentNodeSpec {
@@ -38,6 +42,7 @@ public record AgentNodeSpec(
         }
         capabilities = capabilities != null ? List.copyOf(capabilities) : List.of();
         axisVocabularies = axisVocabularies != null ? Map.copyOf(axisVocabularies) : null;
+        providerConfigs = providerConfigs != null ? List.copyOf(providerConfigs) : List.of();
     }
 
     @Override

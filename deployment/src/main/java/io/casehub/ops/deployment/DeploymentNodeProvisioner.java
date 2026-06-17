@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import io.casehub.desiredstate.api.*;
+import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.ops.api.deployment.*;
 import io.casehub.ops.deployment.handler.*;
 
@@ -14,17 +15,21 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
     private final ChannelProvisionHandler channelHandler;
     private final CaseTypeProvisionHandler caseTypeHandler;
     private final TrustPolicyProvisionHandler trustHandler;
+    private final SpecHashStore specHashStore;
 
     @Inject
     public DeploymentNodeProvisioner(
-            AgentProvisionHandler agentHandler,
+            AgentRegistry agentRegistry,
+            DeploymentProviderConfigStore providerConfigStore,
             ChannelProvisionHandler channelHandler,
             CaseTypeProvisionHandler caseTypeHandler,
-            TrustPolicyProvisionHandler trustHandler) {
-        this.agentHandler = agentHandler;
+            TrustPolicyProvisionHandler trustHandler,
+            SpecHashStore specHashStore) {
+        this.agentHandler = new AgentProvisionHandler(agentRegistry, providerConfigStore);
         this.channelHandler = channelHandler;
         this.caseTypeHandler = caseTypeHandler;
         this.trustHandler = trustHandler;
+        this.specHashStore = specHashStore;
     }
 
     @Override
@@ -32,12 +37,16 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
         if (!(node.spec() instanceof DeploymentNodeSpec spec)) {
             return new ProvisionResult.Failed("spec is not DeploymentNodeSpec");
         }
-        return switch (spec) {
+        ProvisionResult result = switch (spec) {
             case AgentNodeSpec s -> agentHandler.provision(s, context);
             case ChannelNodeSpec s -> channelHandler.provision(s, context);
             case CaseTypeNodeSpec s -> caseTypeHandler.provision(s, context);
             case TrustPolicyNodeSpec s -> trustHandler.provision(s, context);
         };
+        if (result instanceof ProvisionResult.Success) {
+            specHashStore.record(node.id(), node.spec());
+        }
+        return result;
     }
 
     @Override
@@ -45,11 +54,15 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
         if (!(node.spec() instanceof DeploymentNodeSpec spec)) {
             return new DeprovisionResult.Failed("spec is not DeploymentNodeSpec");
         }
-        return switch (spec) {
+        DeprovisionResult result = switch (spec) {
             case AgentNodeSpec s -> agentHandler.deprovision(s, context);
             case ChannelNodeSpec s -> channelHandler.deprovision(s, context);
             case CaseTypeNodeSpec s -> caseTypeHandler.deprovision(s, context);
             case TrustPolicyNodeSpec s -> trustHandler.deprovision(s, context);
         };
+        if (result instanceof DeprovisionResult.Success) {
+            specHashStore.remove(node.id());
+        }
+        return result;
     }
 }

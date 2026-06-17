@@ -24,14 +24,14 @@ public class DeploymentTrustRoutingPolicyProvider implements TrustRoutingPolicyP
     /**
      * Store a policy for the given capability. Called by TrustPolicyProvisionHandler during provision.
      */
-    void store(String capability, TrustRoutingPolicy policy) {
+    public void store(String capability, TrustRoutingPolicy policy) {
         policies.put(capability, policy);
     }
 
     /**
      * Remove a policy for the given capability. Called by TrustPolicyProvisionHandler during deprovision.
      */
-    void remove(String capability) {
+    public void remove(String capability) {
         policies.remove(capability);
     }
 }

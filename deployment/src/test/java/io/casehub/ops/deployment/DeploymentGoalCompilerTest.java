@@ -78,6 +78,8 @@ class DeploymentGoalCompilerTest {
                 "issue",
                 "1.0",
                 "Issue Tracking",
+                null,
+                null,
                 null);
         var goals = new DeploymentGoals(
                 List.of(),
@@ -150,6 +152,8 @@ class DeploymentGoalCompilerTest {
                 "issue",
                 "1.0",
                 "Issue Tracking",
+                null,
+                null,
                 null);
         var trustPolicy = new TrustPolicyNodeSpec(
                 "code-review",
@@ -193,13 +197,72 @@ class DeploymentGoalCompilerTest {
         assertThat(graph.dependencies()).isEmpty();
     }
 
+    @Test
+    void compilesCaseTypeWithDefinitionFile() {
+        var caseType = new CaseTypeNodeSpec(
+                "io.casehub.devtown", "pr-review", "1.0",
+                "PR Review", "Automated",
+                "test-case-defs/pr-review.yaml", null);
+        var goals = new DeploymentGoals(
+                List.of(), List.of(),
+                List.of(new GoalEntry<>(caseType, List.of())),
+                List.of());
+
+        DesiredStateGraph graph = compiler.compile(goals, factory);
+
+        DesiredNode node = graph.nodes().get(NodeId.of("io.casehub.devtown:pr-review:1.0"));
+        assertThat(node).isNotNull();
+        var resolved = (CaseTypeNodeSpec) node.spec();
+        assertThat(resolved.definitionPayload()).isNotNull();
+        assertThat(resolved.definitionPayload()).containsEntry("namespace", "io.casehub.devtown");
+        assertThat(resolved.definitionFile()).isEqualTo("test-case-defs/pr-review.yaml");
+    }
+
+    @Test
+    void skipsResolutionWhenPayloadAlreadySet() {
+        var payload = java.util.Map.<String, Object>of("namespace", "pre-set");
+        var caseType = new CaseTypeNodeSpec(
+                "io.casehub.devtown", "pr-review", "1.0",
+                "PR Review", "Automated",
+                "test-case-defs/pr-review.yaml", payload);
+        var goals = new DeploymentGoals(
+                List.of(), List.of(),
+                List.of(new GoalEntry<>(caseType, List.of())),
+                List.of());
+
+        DesiredStateGraph graph = compiler.compile(goals, factory);
+
+        var resolved = (CaseTypeNodeSpec) graph.nodes()
+                .get(NodeId.of("io.casehub.devtown:pr-review:1.0")).spec();
+        assertThat(resolved.definitionPayload()).containsEntry("namespace", "pre-set");
+    }
+
+    @Test
+    void caseTypeWithoutDefinitionFilePassesThrough() {
+        var caseType = new CaseTypeNodeSpec(
+                "casehub", "issue", "1.0",
+                "Issue Tracking", null,
+                null, null);
+        var goals = new DeploymentGoals(
+                List.of(), List.of(),
+                List.of(new GoalEntry<>(caseType, List.of())),
+                List.of());
+
+        DesiredStateGraph graph = compiler.compile(goals, factory);
+
+        var resolved = (CaseTypeNodeSpec) graph.nodes()
+                .get(NodeId.of("casehub:issue:1.0")).spec();
+        assertThat(resolved.definitionPayload()).isNull();
+        assertThat(resolved.definitionFile()).isNull();
+    }
+
     private AgentNodeSpec testAgent(String id) {
         return new AgentNodeSpec(id, "Test Agent", "worker",
                 "anthropic", "claude", "opus-4", "1.0", null,
                 null, null, null, null,
                 List.of(new AgentCapability("code-review", null, null, null, null, null, null, null)),
                 new AgentDisposition("collaborative", "strict", null, null, null, false),
-                null, null);
+                null, null, null, List.of());
     }
 
     private ChannelNodeSpec testChannel(String name) {

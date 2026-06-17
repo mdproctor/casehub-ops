@@ -1,4 +1,4 @@
-package io.casehub.ops.deployment;
+package io.casehub.ops.deployment.handler;
 
 import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.desiredstate.api.DeprovisionContext;
@@ -8,6 +8,7 @@ import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.ops.api.deployment.TrustPolicyNodeSpec;
+import io.casehub.ops.deployment.DeploymentTrustRoutingPolicyProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TrustPolicyProvisionHandlerTest {
 
     private DeploymentTrustRoutingPolicyProvider policyProvider;
-    private TrustPolicyProvisionHandler handler;
-    private DesiredStateGraph emptyGraph;
+    private TrustPolicyProvisionHandler          handler;
+    private DesiredStateGraph                    emptyGraph;
 
     @BeforeEach
     void setUp() {

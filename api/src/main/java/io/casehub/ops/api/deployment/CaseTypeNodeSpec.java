@@ -1,11 +1,20 @@
 package io.casehub.ops.api.deployment;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record CaseTypeNodeSpec(
         String namespace,
         String name,
         String version,
         String title,
-        String summary
+        String summary,
+        String definitionFile,
+        Map<String, Object> definitionPayload
 ) implements DeploymentNodeSpec {
 
     public CaseTypeNodeSpec {
@@ -18,6 +27,9 @@ public record CaseTypeNodeSpec(
         if (version == null || version.isBlank()) {
             throw new IllegalArgumentException("version is required");
         }
+        definitionPayload = definitionPayload != null
+                ? Collections.unmodifiableMap(new LinkedHashMap<>(definitionPayload))
+                : null;
     }
 
     @Override

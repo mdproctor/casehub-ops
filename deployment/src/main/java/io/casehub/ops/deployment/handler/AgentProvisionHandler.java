@@ -7,24 +7,28 @@ import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.eidos.api.AgentDescriptor;
 import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.ops.api.deployment.AgentNodeSpec;
+import io.casehub.ops.deployment.DeploymentProviderConfigStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Provisions agent nodes by registering their descriptors with the AgentRegistry.
- * Deprovision is a no-op — AgentRegistry has no deregister method.
+ * Provisions agent nodes by registering their descriptors with the AgentRegistry
+ * and storing their provider configurations.
+ * Deprovision removes provider configs; AgentRegistry has no deregister method.
  */
 @ApplicationScoped
 public class AgentProvisionHandler {
 
     private final AgentRegistry agentRegistry;
+    private final DeploymentProviderConfigStore providerConfigStore;
 
     /**
-     * CDI constructor. Also used by tests with explicit registry for stubbing.
+     * CDI constructor. Also used by tests with explicit registry and store for stubbing.
      */
     @Inject
-    public AgentProvisionHandler(AgentRegistry agentRegistry) {
+    public AgentProvisionHandler(AgentRegistry agentRegistry, DeploymentProviderConfigStore providerConfigStore) {
         this.agentRegistry = agentRegistry;
+        this.providerConfigStore = providerConfigStore;
     }
 
     public ProvisionResult provision(AgentNodeSpec spec, ProvisionContext context) {
@@ -45,14 +49,16 @@ public class AgentProvisionHandler {
                 spec.disposition(),
                 spec.jurisdiction(),
                 spec.dataHandlingPolicy(),
-                context.tenancyId()
+                context.tenancyId(),
+                spec.briefing()
         );
         agentRegistry.register(descriptor);
+        providerConfigStore.store(spec.agentId(), spec.providerConfigs());
         return new ProvisionResult.Success();
     }
 
     public DeprovisionResult deprovision(AgentNodeSpec spec, DeprovisionContext context) {
-        // AgentRegistry has no deregister method — deprovision is a no-op
+        providerConfigStore.remove(spec.agentId());
         return new DeprovisionResult.Success();
     }
 }

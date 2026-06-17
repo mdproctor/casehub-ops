@@ -1,4 +1,4 @@
-package io.casehub.ops.deployment;
+package io.casehub.ops.deployment.handler;
 
 import io.casehub.api.spi.routing.TrustRoutingPolicy;
 import io.casehub.desiredstate.api.DeprovisionContext;
@@ -6,6 +6,7 @@ import io.casehub.desiredstate.api.DeprovisionResult;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.ops.api.deployment.TrustPolicyNodeSpec;
+import io.casehub.ops.deployment.DeploymentTrustRoutingPolicyProvider;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

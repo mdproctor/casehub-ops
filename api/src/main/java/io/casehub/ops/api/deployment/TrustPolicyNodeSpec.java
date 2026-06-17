@@ -2,6 +2,9 @@ package io.casehub.ops.api.deployment;
 
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record TrustPolicyNodeSpec(
         String capability,
         double threshold,

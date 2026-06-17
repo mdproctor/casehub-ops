@@ -13,6 +13,8 @@ import io.casehub.eidos.api.AgentQuery;
 import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.eidos.api.DispositionAxis;
 import io.casehub.ops.api.deployment.AgentNodeSpec;
+import io.casehub.ops.api.deployment.ProviderConfig;
+import io.casehub.ops.deployment.DeploymentProviderConfigStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,13 +28,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentProvisionHandlerTest {
 
     private StubAgentRegistry agentRegistry;
+    private DeploymentProviderConfigStore providerConfigStore;
     private AgentProvisionHandler handler;
     private DesiredStateGraph emptyGraph;
 
     @BeforeEach
     void setUp() {
         agentRegistry = new StubAgentRegistry();
-        handler = new AgentProvisionHandler(agentRegistry);
+        providerConfigStore = new DeploymentProviderConfigStore();
+        handler = new AgentProvisionHandler(agentRegistry, providerConfigStore);
         emptyGraph = new DefaultDesiredStateGraphFactory().empty();
     }
 
@@ -66,7 +70,9 @@ class AgentProvisionHandlerTest {
                 List.of(analyzeCapability, classifyCapability),
                 disposition,
                 "EU",
-                "GDPR-compliant"
+                "GDPR-compliant",
+                null,
+                List.of()
         );
 
         ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
@@ -96,6 +102,7 @@ class AgentProvisionHandlerTest {
         assertThat(descriptor.jurisdiction()).isEqualTo("EU");
         assertThat(descriptor.dataHandlingPolicy()).isEqualTo("GDPR-compliant");
         assertThat(descriptor.tenancyId()).isEqualTo("tenant-1");
+        assertThat(descriptor.briefing()).isNull();
     }
 
     @Test
@@ -125,7 +132,9 @@ class AgentProvisionHandlerTest {
                 List.of(cap1),
                 disp1,
                 "US",
-                "policy-1"
+                "policy-1",
+                null,
+                List.of()
         );
 
         AgentNodeSpec spec2 = new AgentNodeSpec(
@@ -144,7 +153,9 @@ class AgentProvisionHandlerTest {
                 List.of(cap2),
                 disp2,
                 "EU",
-                "policy-2"
+                "policy-2",
+                null,
+                List.of()
         );
 
         ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
@@ -184,13 +195,95 @@ class AgentProvisionHandlerTest {
                 List.of(cap),
                 disp,
                 "US",
-                "policy"
+                "policy",
+                null,
+                List.of()
         );
 
         DeprovisionContext context = new DeprovisionContext("tenant-1", emptyGraph);
         DeprovisionResult result = handler.deprovision(spec, context);
 
         assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+    }
+
+    @Test
+    void provisionStoresProviderConfigs() {
+        AgentCapability cap = new AgentCapability(
+                "cap", null, null, null, List.of(), List.of(), List.of(), Map.of()
+        );
+        AgentDisposition disp = AgentDisposition.builder().delegation(false).build();
+
+        ProviderConfig claudonyConfig = new ProviderConfig("claudony", Map.of("tools", "read,write"));
+        ProviderConfig openclawConfig = new ProviderConfig("openclaw", Map.of("sessionKey", "reviewer"));
+
+        AgentNodeSpec spec = new AgentNodeSpec(
+                "agent-1",
+                "Test Agent",
+                "worker",
+                "anthropic",
+                "claude",
+                "4.6",
+                "1.0",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(cap),
+                disp,
+                null,
+                null,
+                null,
+                List.of(claudonyConfig, openclawConfig)
+        );
+
+        handler.provision(spec, new ProvisionContext("tenant-1", emptyGraph));
+
+        List<ProviderConfig> stored = providerConfigStore.forAgent("agent-1");
+        assertThat(stored).hasSize(2);
+        assertThat(stored).extracting(ProviderConfig::providerName)
+                .containsExactly("claudony", "openclaw");
+        assertThat(stored.get(0).config()).containsEntry("tools", "read,write");
+        assertThat(stored.get(1).config()).containsEntry("sessionKey", "reviewer");
+    }
+
+    @Test
+    void deprovisionRemovesProviderConfigs() {
+        AgentCapability cap = new AgentCapability(
+                "cap", null, null, null, List.of(), List.of(), List.of(), Map.of()
+        );
+        AgentDisposition disp = AgentDisposition.builder().delegation(false).build();
+
+        ProviderConfig config = new ProviderConfig("claudony", Map.of("tools", "read"));
+
+        AgentNodeSpec spec = new AgentNodeSpec(
+                "agent-1",
+                "Test Agent",
+                "worker",
+                "anthropic",
+                "claude",
+                "4.6",
+                "1.0",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(cap),
+                disp,
+                null,
+                null,
+                null,
+                List.of(config)
+        );
+
+        // Provision then deprovision
+        handler.provision(spec, new ProvisionContext("tenant-1", emptyGraph));
+        assertThat(providerConfigStore.forAgent("agent-1")).hasSize(1);
+
+        handler.deprovision(spec, new DeprovisionContext("tenant-1", emptyGraph));
+
+        assertThat(providerConfigStore.forAgent("agent-1")).isEmpty();
     }
 
     static class StubAgentRegistry implements AgentRegistry {

@@ -4,6 +4,7 @@ import io.casehub.desiredstate.api.*;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.eidos.api.*;
 import io.casehub.ops.api.deployment.*;
+import io.casehub.ops.deployment.drift.*;
 import io.casehub.ops.deployment.handler.*;
 import io.casehub.qhorus.api.channel.ChannelSemantic;
 import io.casehub.qhorus.api.message.MessageType;
@@ -31,6 +32,8 @@ class DeploymentLifecycleIntegrationTest {
     private StubChannelOperations channelOps;
     private CaseTypeProvisionHandler caseTypeHandler;
     private DeploymentTrustRoutingPolicyProvider trustProvider;
+    private SpecHashStore specHashStore;
+    private DeploymentProviderConfigStore providerConfigStore;
 
     private static final String TENANCY_ID = "tenant-1";
 
@@ -39,21 +42,31 @@ class DeploymentLifecycleIntegrationTest {
         // Create stubs
         agentRegistry = new StubAgentRegistry();
         channelOps = new StubChannelOperations();
+        providerConfigStore = new DeploymentProviderConfigStore();
         caseTypeHandler = new CaseTypeProvisionHandler();
         trustProvider = new DeploymentTrustRoutingPolicyProvider();
+
+        // Create shared spec hash store
+        specHashStore = new SpecHashStore();
+
+        // Create drift checkers that use the stubs
+        var agentChecker = new AgentDriftChecker(agentRegistry);
+        var channelChecker = new ChannelDriftChecker(channelOps::findByName);
+        var caseTypeChecker = new CaseTypeDriftChecker(caseTypeHandler);
+        var trustChecker = new TrustPolicyDriftChecker(trustProvider);
 
         // Wire everything
         compiler = new DeploymentGoalCompiler();
         provisioner = new DeploymentNodeProvisioner(
-                new AgentProvisionHandler(agentRegistry),
+                agentRegistry,
+                providerConfigStore,
                 new ChannelProvisionHandler(channelOps),
                 caseTypeHandler,
-                new TrustPolicyProvisionHandler(trustProvider));
+                new TrustPolicyProvisionHandler(trustProvider),
+                specHashStore);
         adapter = new DeploymentActualStateAdapter(
-                agentRegistry,
-                channelOps::findByName,
-                caseTypeHandler,
-                trustProvider,
+                List.of(agentChecker, channelChecker, caseTypeChecker, trustChecker),
+                specHashStore,
                 TENANCY_ID);
         eventSource = new DeploymentEventSource();
         faultPolicy = new DeploymentFaultPolicy();
@@ -65,13 +78,14 @@ class DeploymentLifecycleIntegrationTest {
         // Declare 4 nodes (one of each type)
         var agentCap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
         var agentDisp = AgentDisposition.builder().delegation(false).build();
+        var claudonyConfig = new ProviderConfig("claudony", Map.of("tools", "read,write"));
         var agentSpec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
-                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy");
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", "Reviews code quality", List.of(claudonyConfig));
 
         var channelSpec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
                 Set.of(MessageType.COMMAND), Set.of(), null, null, null, null, null, null, null, null, null);
 
-        var caseTypeSpec = new CaseTypeNodeSpec("ns", "Incident", "1.0", "Incident Case", "summary");
+        var caseTypeSpec = new CaseTypeNodeSpec("io.casehub.devtown", "pr-review", "1.0", "PR Review", "Automated", "test-case-defs/pr-review.yaml", null);
 
         var trustSpec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
 
@@ -100,6 +114,58 @@ class DeploymentLifecycleIntegrationTest {
         for (var status : actual.statuses().values()) {
             assertThat(status).isEqualTo(NodeStatus.PRESENT);
         }
+
+        // Verify provider configs stored
+        assertThat(providerConfigStore.forAgent("agent-1")).hasSize(1);
+        var storedConfig = providerConfigStore.forAgent("agent-1").get(0);
+        assertThat(storedConfig.providerName()).isEqualTo("claudony");
+        assertThat(storedConfig.config().get("tools")).isEqualTo("read,write");
+
+        // Verify case type definition payload resolved
+        var caseTypeNode = desired.nodes().values().stream()
+                .filter(n -> n.spec() instanceof CaseTypeNodeSpec)
+                .findFirst()
+                .orElseThrow();
+        var resolvedSpec = (CaseTypeNodeSpec) caseTypeNode.spec();
+        assertThat(resolvedSpec.definitionPayload()).isNotNull();
+        assertThat(resolvedSpec.definitionPayload().get("namespace")).isEqualTo("io.casehub.devtown");
+        assertThat(resolvedSpec.definitionPayload().get("name")).isEqualTo("pr-review");
+    }
+
+    @Test
+    void driftDetection_specHashChangeReportsDrifted() {
+        // Create and provision an agent
+        var agentCap = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var agentDisp = AgentDisposition.builder().delegation(false).build();
+        var agentSpec = new AgentNodeSpec("agent-drift", "Original", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", null, List.of());
+
+        var deploymentGoals = new DeploymentGoals(
+                List.of(new GoalEntry<>(agentSpec, List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+
+        var desired = compiler.compile(deploymentGoals, graphFactory);
+        var provisionContext = new ProvisionContext(TENANCY_ID, desired);
+        var node = desired.nodes().values().iterator().next();
+        var result = provisioner.provision(node, provisionContext);
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+
+        // Compile a modified agent (different name field = different spec hash)
+        var modifiedSpec = new AgentNodeSpec("agent-drift", "Modified Name", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", null, List.of());
+        var modifiedGoals = new DeploymentGoals(
+                List.of(new GoalEntry<>(modifiedSpec, List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
+
+        // Read actual state — should detect drift
+        var actual = adapter.readActual(modifiedDesired);
+        var status = actual.statuses().get(NodeId.of("agent-drift"));
+        assertThat(status).isEqualTo(NodeStatus.DRIFTED);
     }
 
     @Test

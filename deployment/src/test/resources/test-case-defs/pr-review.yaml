@@ -1,0 +1,9 @@
+namespace: io.casehub.devtown
+name: pr-review
+version: "1.0"
+title: Pull Request Review
+summary: Automated PR review
+capabilities:
+  - name: code-review
+    tags: [java, quarkus]
+optionalField: null

@@ -2,176 +2,105 @@ package io.casehub.ops.deployment;
 
 import io.casehub.desiredstate.api.*;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
-import io.casehub.eidos.api.*;
 import io.casehub.ops.api.deployment.*;
-import io.casehub.ops.deployment.handler.CaseTypeProvisionHandler;
-import io.casehub.qhorus.api.channel.ChannelSemantic;
-import io.casehub.qhorus.api.message.MessageType;
-import io.casehub.qhorus.runtime.channel.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class DeploymentActualStateAdapterTest {
 
     private DeploymentActualStateAdapter adapter;
-    private StubAgentRegistry agentRegistry;
-    private Map<String, Channel> channels;
+    private SpecHashStore specHashStore;
+    private StubDriftChecker agentChecker;
+    private StubDriftChecker channelChecker;
     private DefaultDesiredStateGraphFactory graphFactory;
-    private static final String TENANCY_ID = "tenant-1";
 
     @BeforeEach
     void setUp() {
-        agentRegistry = new StubAgentRegistry();
-        channels = new ConcurrentHashMap<>();
+        specHashStore = new SpecHashStore();
+        agentChecker = new StubDriftChecker("agent");
+        channelChecker = new StubDriftChecker("channel");
         graphFactory = new DefaultDesiredStateGraphFactory();
-        var caseTypeHandler = new CaseTypeProvisionHandler();
-        var trustProvider = new DeploymentTrustRoutingPolicyProvider();
-
         adapter = new DeploymentActualStateAdapter(
-                agentRegistry,
-                name -> Optional.ofNullable(channels.get(name)),
-                caseTypeHandler,
-                trustProvider,
-                TENANCY_ID);
+                List.of(agentChecker, channelChecker), specHashStore);
     }
 
     @Test
-    void agentPresent() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
-        var descriptor = new AgentDescriptor(
-                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
-                "domain", "slot", "disp", Map.of(), "worker",
-                List.of(cap), null, "US", "policy", TENANCY_ID);
-        agentRegistry.register(descriptor);
-
-        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
-                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), null, "US", "policy");
+    void absentStaysAbsent() {
+        agentChecker.nextStatus = NodeStatus.ABSENT;
+        var spec = minimalAgent("agent-1");
         var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.PRESENT, actual.statuses().get(NodeId.of("a1")));
+        assertThat(actual.statuses().get(NodeId.of("a1"))).isEqualTo(NodeStatus.ABSENT);
     }
 
     @Test
-    void agentAbsent() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
-        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
-                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), null, "US", "policy");
+    void externalDriftedStaysDrifted() {
+        agentChecker.nextStatus = NodeStatus.DRIFTED;
+        var spec = minimalAgent("agent-1");
         var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.ABSENT, actual.statuses().get(NodeId.of("a1")));
+        assertThat(actual.statuses().get(NodeId.of("a1"))).isEqualTo(NodeStatus.DRIFTED);
     }
 
     @Test
-    void agentDrifted_capabilitiesMismatch() {
-        var cap1 = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
-        var cap2 = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of());
-
-        var descriptor = new AgentDescriptor(
-                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
-                "domain", "slot", "disp", Map.of(), "worker",
-                List.of(cap1), null, "US", "policy", TENANCY_ID);
-        agentRegistry.register(descriptor);
-
-        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
-                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap2), null, "US", "policy");
+    void presentWithMatchingHashStaysPresent() {
+        agentChecker.nextStatus = NodeStatus.PRESENT;
+        var spec = minimalAgent("agent-1");
+        specHashStore.record(NodeId.of("a1"), spec);
         var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.DRIFTED, actual.statuses().get(NodeId.of("a1")));
+        assertThat(actual.statuses().get(NodeId.of("a1"))).isEqualTo(NodeStatus.PRESENT);
     }
 
     @Test
-    void channelPresent() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.allowedTypes = MessageType.serializeTypes(Set.of(MessageType.COMMAND));
-        ch.deniedTypes = null;
-        ch.rateLimitPerChannel = null;
-        ch.rateLimitPerInstance = null;
-        channels.put("dev/work", ch);
-
-        var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
-                Set.of(MessageType.COMMAND), Set.of(), null, null, null, null, null, null, null, null, null);
-        var node = new DesiredNode(NodeId.of("ch1"), NodeType.of("channel"), spec, false);
+    void presentWithDriftedHashBecomesDrifted() {
+        agentChecker.nextStatus = NodeStatus.PRESENT;
+        var specOld = minimalAgent("agent-1");
+        specHashStore.record(NodeId.of("a1"), specOld);
+        var specNew = new AgentNodeSpec("agent-1", "Changed", "worker",
+                null, null, null, null, null, null, null, null, null,
+                List.of(), null, null, null, null, List.of());
+        var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), specNew, false);
         var graph = graphFactory.of(List.of(node), List.of());
-
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.PRESENT, actual.statuses().get(NodeId.of("ch1")));
+        assertThat(actual.statuses().get(NodeId.of("a1"))).isEqualTo(NodeStatus.DRIFTED);
     }
 
     @Test
-    void channelDrifted_allowedTypesMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.allowedTypes = MessageType.serializeTypes(Set.of(MessageType.COMMAND));
-        ch.deniedTypes = null;
-        ch.rateLimitPerChannel = null;
-        ch.rateLimitPerInstance = null;
-        channels.put("dev/work", ch);
-
-        var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
-                Set.of(MessageType.EVENT), Set.of(), null, null, null, null, null, null, null, null, null);
-        var node = new DesiredNode(NodeId.of("ch1"), NodeType.of("channel"), spec, false);
+    void unknownStaysUnknown() {
+        agentChecker.nextStatus = NodeStatus.UNKNOWN;
+        var spec = minimalAgent("agent-1");
+        var node = new DesiredNode(NodeId.of("a1"), NodeType.of("agent"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.DRIFTED, actual.statuses().get(NodeId.of("ch1")));
+        assertThat(actual.statuses().get(NodeId.of("a1"))).isEqualTo(NodeStatus.UNKNOWN);
     }
 
     @Test
-    void caseTypeAndTrustAlwaysPresent() {
-        var caseTypeSpec = new CaseTypeNodeSpec("ns", "Incident", "1.0", "Incident Case", "summary");
-        var caseTypeNode = new DesiredNode(NodeId.of("ct1"), NodeType.of("case_type"), caseTypeSpec, false);
-
-        var trustSpec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
-        var trustNode = new DesiredNode(NodeId.of("tp1"), NodeType.of("trust_policy"), trustSpec, false);
-
-        var graph = graphFactory.of(List.of(caseTypeNode, trustNode), List.of());
-
+    void unknownNodeTypeReturnsUnknown() {
+        var unknownSpec = new NodeSpec() {};
+        var node = new DesiredNode(NodeId.of("x1"), NodeType.of("unknown_type"), unknownSpec, false);
+        var graph = graphFactory.of(List.of(node), List.of());
         var actual = adapter.readActual(graph);
-
-        assertEquals(NodeStatus.PRESENT, actual.statuses().get(NodeId.of("ct1")));
-        assertEquals(NodeStatus.PRESENT, actual.statuses().get(NodeId.of("tp1")));
+        assertThat(actual.statuses().get(NodeId.of("x1"))).isEqualTo(NodeStatus.UNKNOWN);
     }
 
-    // Test stub
-    static class StubAgentRegistry implements AgentRegistry {
-        private final Map<String, AgentDescriptor> agents = new ConcurrentHashMap<>();
+    private AgentNodeSpec minimalAgent(String id) {
+        return new AgentNodeSpec(id, "Agent", "worker",
+                null, null, null, null, null, null, null, null, null,
+                List.of(), null, null, null, null, List.of());
+    }
 
-        @Override
-        public void register(AgentDescriptor descriptor) {
-            String key = descriptor.agentId() + ":" + descriptor.tenancyId();
-            agents.put(key, descriptor);
-        }
-
-        @Override
-        public Optional<AgentDescriptor> findById(String agentId, String tenancyId) {
-            String key = agentId + ":" + tenancyId;
-            return Optional.ofNullable(agents.get(key));
-        }
-
-        @Override
-        public List<AgentDescriptor> find(AgentQuery query) {
-            return new ArrayList<>(agents.values());
-        }
+    static class StubDriftChecker implements NodeDriftChecker {
+        private final String type;
+        NodeStatus nextStatus = NodeStatus.UNKNOWN;
+        StubDriftChecker(String type) { this.type = type; }
+        @Override public String nodeType() { return type; }
+        @Override public NodeStatus check(NodeSpec spec, String tenancyId) { return nextStatus; }
     }
 }

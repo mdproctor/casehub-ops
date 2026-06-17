@@ -31,7 +31,9 @@ class CaseTypeProvisionHandlerTest {
                 "contract-review",
                 "1.0.0",
                 "Contract Review Case",
-                "Review and approve legal contracts"
+                "Review and approve legal contracts",
+                null,
+                null
         );
 
         ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
@@ -51,7 +53,9 @@ class CaseTypeProvisionHandlerTest {
                 "contract-review",
                 "1.0.0",
                 "Contract Review Case",
-                "Review and approve legal contracts"
+                "Review and approve legal contracts",
+                null,
+                null
         );
 
         ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
@@ -65,7 +69,7 @@ class CaseTypeProvisionHandlerTest {
     @Test
     void deprovisionRemovesRegistration() {
         CaseTypeNodeSpec spec = new CaseTypeNodeSpec(
-                "io.casehub.legal", "contract-review", "1.0.0", null, null);
+                "io.casehub.legal", "contract-review", "1.0.0", null, null, null, null);
 
         handler.provision(spec, new ProvisionContext("tenant-1", emptyGraph));
         assertThat(handler.isRegistered(spec.nodeId())).isTrue();
@@ -79,10 +83,46 @@ class CaseTypeProvisionHandlerTest {
     @Test
     void deprovisionIdempotent_absentReturnsSuccess() {
         CaseTypeNodeSpec spec = new CaseTypeNodeSpec(
-                "io.casehub.legal", "nonexistent", "1.0.0", null, null);
+                "io.casehub.legal", "nonexistent", "1.0.0", null, null, null, null);
 
         DeprovisionResult result = handler.deprovision(spec, new DeprovisionContext("tenant-1", emptyGraph));
 
         assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+    }
+
+    @Test
+    void provisionWithDefinitionPayloadBuildsFromPayload() {
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("namespace", "io.casehub.devtown");
+        payload.put("name", "pr-review");
+        payload.put("version", "1.0");
+        payload.put("title", "PR Review");
+        payload.put("summary", "Automated pull request review");
+        CaseTypeNodeSpec spec = new CaseTypeNodeSpec(
+                "io.casehub.devtown", "pr-review", "1.0",
+                "PR Review", "Automated pull request review",
+                "case-defs/pr-review.yaml", payload
+        );
+
+        ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
+        ProvisionResult result = handler.provision(spec, context);
+
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+        assertThat(handler.isRegistered(spec.nodeId())).isTrue();
+    }
+
+    @Test
+    void provisionWithoutPayloadBuildsSkeleton() {
+        CaseTypeNodeSpec spec = new CaseTypeNodeSpec(
+                "io.casehub.legal", "contract-review", "1.0.0",
+                "Contract Review", "Review contracts",
+                null, null
+        );
+
+        ProvisionContext context = new ProvisionContext("tenant-1", emptyGraph);
+        ProvisionResult result = handler.provision(spec, context);
+
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+        assertThat(handler.isRegistered(spec.nodeId())).isTrue();
     }
 }

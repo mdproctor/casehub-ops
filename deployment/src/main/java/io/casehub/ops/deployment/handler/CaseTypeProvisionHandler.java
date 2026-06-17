@@ -30,21 +30,37 @@ public class CaseTypeProvisionHandler {
     /**
      * Test constructor accepting explicit map for stubbing.
      */
-    CaseTypeProvisionHandler(ConcurrentHashMap<String, CaseDefinition> definitions) {
+    public CaseTypeProvisionHandler(ConcurrentHashMap<String, CaseDefinition> definitions) {
         this.definitions = definitions;
     }
 
     public ProvisionResult provision(CaseTypeNodeSpec spec, ProvisionContext context) {
-        CaseDefinition definition = CaseDefinition.builder()
-                .namespace(spec.namespace())
-                .name(spec.name())
-                .version(spec.version())
-                .title(spec.title())
-                .summary(spec.summary())
-                .build();
+        CaseDefinition definition;
+        if (spec.definitionPayload() != null) {
+            definition = buildFromPayload(spec);
+        } else {
+            definition = CaseDefinition.builder()
+                    .namespace(spec.namespace())
+                    .name(spec.name())
+                    .version(spec.version())
+                    .title(spec.title())
+                    .summary(spec.summary())
+                    .build();
+        }
 
         definitions.put(spec.nodeId(), definition);
         return new ProvisionResult.Success();
+    }
+
+    private CaseDefinition buildFromPayload(CaseTypeNodeSpec spec) {
+        var builder = CaseDefinition.builder()
+                .namespace(spec.namespace())
+                .name(spec.name())
+                .version(spec.version());
+        var payload = spec.definitionPayload();
+        if (payload.containsKey("title")) builder.title((String) payload.get("title"));
+        if (payload.containsKey("summary")) builder.summary((String) payload.get("summary"));
+        return builder.build();
     }
 
     public DeprovisionResult deprovision(CaseTypeNodeSpec spec, DeprovisionContext context) {
@@ -53,9 +69,9 @@ public class CaseTypeProvisionHandler {
     }
 
     /**
-     * Check if a case type is registered. Package-visible for the actual state adapter.
+     * Check if a case type is registered. Used by CaseTypeDriftChecker.
      */
-    boolean isRegistered(String nodeId) {
+    public boolean isRegistered(String nodeId) {
         return definitions.containsKey(nodeId);
     }
 }
