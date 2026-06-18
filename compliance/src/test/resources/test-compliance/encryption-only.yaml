@@ -1,0 +1,15 @@
+controls:
+  - spec:
+      controlId: encryption-at-rest
+      controlType: ENCRYPTION_AT_REST
+      title: "Encryption at Rest"
+      description: "AES-256 required"
+      frameworks:
+        - framework: SOC2
+          requirement: CC6.1
+        - framework: GDPR
+          requirement: Art.32
+      evidenceMaxAgeDays: 30
+      requiresHumanReview: false
+      properties:
+        cipher: AES-256

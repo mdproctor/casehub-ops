@@ -1,0 +1,75 @@
+controls:
+  - spec:
+      controlId: encryption-at-rest
+      controlType: ENCRYPTION_AT_REST
+      title: "Encryption at Rest"
+      description: "AES-256 required"
+      frameworks:
+        - framework: SOC2
+          requirement: CC6.1
+      evidenceMaxAgeDays: 30
+      requiresHumanReview: false
+      properties:
+        cipher: AES-256
+  - spec:
+      controlId: log-retention-policy
+      controlType: LOG_RETENTION
+      title: "Log Retention Policy"
+      description: "1 year retention"
+      frameworks:
+        - framework: SOC2
+          requirement: CC7.2
+      evidenceMaxAgeDays: 90
+      requiresHumanReview: false
+      properties:
+        retentionDays: 365
+  - spec:
+      controlId: access-review-quarterly
+      controlType: ACCESS_REVIEW
+      title: "Quarterly Access Review"
+      description: "All user access reviewed quarterly"
+      frameworks:
+        - framework: SOC2
+          requirement: CC6.2
+      evidenceMaxAgeDays: 90
+      requiresHumanReview: true
+      properties:
+        cadence: quarterly
+  - spec:
+      controlId: incident-response-playbook
+      controlType: INCIDENT_RESPONSE
+      title: "Incident Response Playbook"
+      description: "Annual playbook test"
+      frameworks:
+        - framework: SOC2
+          requirement: CC7.4
+      evidenceMaxAgeDays: 365
+      requiresHumanReview: true
+      properties:
+        testCadence: annual
+  - spec:
+      controlId: data-processing-records
+      controlType: DATA_PROCESSING
+      title: "Data Processing Records"
+      description: "GDPR Art.30 records"
+      frameworks:
+        - framework: GDPR
+          requirement: Art.30
+      evidenceMaxAgeDays: 30
+      requiresHumanReview: false
+      properties:
+        scope: all-processing-activities
+  - spec:
+      controlId: ai-risk-assessment
+      controlType: AI_RISK_ASSESSMENT
+      title: "AI System Risk Assessment"
+      description: "EU AI Act Art.12"
+      frameworks:
+        - framework: EU_AI_ACT
+          requirement: Art.12
+      evidenceMaxAgeDays: 365
+      requiresHumanReview: true
+      properties:
+        riskTier: high
+    dependsOn:
+      - data-processing-records
