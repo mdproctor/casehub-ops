@@ -33,7 +33,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentPresent() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
@@ -48,7 +48,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentAbsent() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), null, "US", "policy", null, List.of());
 
@@ -57,8 +57,8 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentDrifted_capabilitiesMismatch() {
-        var cap1 = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
-        var cap2 = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var cap1 = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap2 = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
 
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",

@@ -76,7 +76,7 @@ class DeploymentLifecycleIntegrationTest {
     @Test
     void fullLifecycle_declare_compile_provision_readState() {
         // Declare 4 nodes (one of each type)
-        var agentCap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var agentCap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var agentDisp = AgentDisposition.builder().delegation(false).build();
         var claudonyConfig = new ProviderConfig("claudony", Map.of("tools", "read,write"));
         var agentSpec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
@@ -135,7 +135,7 @@ class DeploymentLifecycleIntegrationTest {
     @Test
     void driftDetection_specHashChangeReportsDrifted() {
         // Create and provision an agent
-        var agentCap = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var agentCap = new AgentCapability("cap-b", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var agentDisp = AgentDisposition.builder().delegation(false).build();
         var agentSpec = new AgentNodeSpec("agent-drift", "Original", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", null, List.of());

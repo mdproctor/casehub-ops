@@ -48,7 +48,7 @@ class DeploymentNodeProvisionerTest {
 
     @Test
     void dispatchesAgentToHandler() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of());
+        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var disp = AgentDisposition.builder().delegation(false).build();
         var spec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy", null, List.of());
