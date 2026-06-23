@@ -54,6 +54,10 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 - Pruning always before growing — dependency-aware ordering guaranteed by the runtime TransitionPlanner
 - tenancyId propagated through all calls — bind in repository/adapter layer only
 
+## Architecture Record
+
+**Primary record:** `ARC42STORIES.MD` (project root)
+
 ## Cross-Repo Conventions
 
 Protocols live in `casehub/garden`. Do not write protocol files in this repo.
