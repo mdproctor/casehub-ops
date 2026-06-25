@@ -164,6 +164,12 @@
                 <artifactId>casehub-iot-api</artifactId>
                 <version>${version.io.casehub}</version>
             </dependency>
+            <dependency>
+                <groupId>io.casehub</groupId>
+                <artifactId>casehub-iot-testing</artifactId>
+                <version>${version.io.casehub}</version>
+                <scope>test</scope>
+            </dependency>
 
             <dependency>
                 <groupId>org.assertj</groupId>
