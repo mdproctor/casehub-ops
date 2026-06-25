@@ -1,0 +1,7 @@
+tenancyId: test-tenant
+devices:
+  - deviceId: fan-1
+    deviceClass: FAN
+    label: Bedroom Fan
+    config:
+      isOn: false

@@ -1,0 +1,23 @@
+tenancyId: test-tenant
+devices:
+  - deviceId: hub-1
+    deviceClass: SWITCH
+    label: Zigbee Hub
+    config:
+      isOn: true
+  - deviceId: thermo-1
+    deviceClass: THERMOSTAT
+    label: Living Room
+    dependsOn: [hub-1]
+    config:
+      targetTemperature:
+        value: 22
+        unit: CELSIUS
+      mode: HEAT
+  - deviceId: light-1
+    deviceClass: LIGHT
+    label: Porch Light
+    physical: false
+    config:
+      isOn: true
+      brightness: 80

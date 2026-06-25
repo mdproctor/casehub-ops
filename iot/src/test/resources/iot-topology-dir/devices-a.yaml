@@ -1,0 +1,7 @@
+tenancyId: test-tenant
+devices:
+  - deviceId: lock-1
+    deviceClass: LOCK
+    label: Front Door
+    config:
+      isLocked: true
