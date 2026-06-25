@@ -131,6 +131,18 @@ Each domain maps its own domain model onto these five SPIs. The runtime handles 
 - C2 (Deployment) before C3 (Compliance): C2 establishes the flat-graph pattern (no backend abstraction) and sealed type dispatch. C3 uses a different pattern (generic control spec with discriminator) — having both in the codebase demonstrates when each is appropriate.
 - C3 (Compliance) before C4 (IoT): C3 introduces ledger integration (ComplianceLedgerEntry). C4 builds on casehub-iot foundation which is independently developed.
 
+### Type Strategy Selection
+
+Three type strategies emerged across the domain modules, each fitting a different structural situation:
+
+| Strategy | When | Example |
+|---|---|---|
+| Sealed hierarchy | Variants have different fields and provisioning semantics | `IoTNodeSpec` → `PhysicalDeviceSpec` (label, human-provisioned) vs `DeviceConfigSpec` (capabilities map, auto-provisioned) |
+| Sealed with wrapper | Backend routing metadata needed alongside domain spec | `InfraDesiredNodeSpec` wraps `InfraNodeSpec` + `backendId` |
+| Generic record with discriminator | Variants differ in configuration, not shape | `ComplianceControlSpec` with `controlType` discriminator |
+
+The IoT domain confirmed this taxonomy: PhysicalDeviceSpec and DeviceConfigSpec have genuinely different provisioning semantics (human vs automated) and different fields — a structural difference requiring sealed hierarchy without wrapper.
+
 ---
 
 ## §5 Building Block View
@@ -230,6 +242,19 @@ Each domain defines a goal loader (e.g. `DeploymentGoalLoader`, `ComplianceGoalL
 
 Both deployment and compliance modules use an in-memory `ConcurrentHashMap<NodeId, Integer>` to detect when a node's desired spec changes between reconciliation cycles. If the spec hash differs from the last provisioned hash, the node is reported as `DRIFTED` even if the actual state matches the old spec. This forces re-provisioning with the updated declaration.
 
+### Capability Normalization Across Type Boundaries
+
+Comparing desired state (YAML-parsed) against actual state (IoT API) requires normalizing both sides to a common representation. The critical boundary: YAML parses `22` as `Integer`, the IoT `Temperature` type uses `BigDecimal`, and `BigDecimal.equals()` is scale-sensitive (`22.0 ≠ 22`).
+
+Normalization rules:
+- All numeric types → `BigDecimal.stripTrailingZeros()` (scale-safe equality)
+- `Temperature` → `Map.of("value", BigDecimal, "unit", String)` (both sides must normalize nested maps)
+- `Enum<?>` → `name()` string
+- `Map<String, Object>` → recursive normalization (the desired side has `Integer` inside nested temperature maps)
+- Null values → filtered out (IoT devices include nullable capabilities for Optional fields like `brightness`)
+
+The normalizer is stateless and applied on both sides of the comparison — `CapabilityNormalizer.normalize()` in `IoTActualStateAdapter` and `IoTNodeProvisioner`.
+
 ### Anti-patterns
 
 **Symptom:** CDI ambiguity errors at startup — multiple beans of type `GoalCompiler`, `NodeProvisioner`, etc.
@@ -237,8 +262,8 @@ Both deployment and compliance modules use an in-memory `ConcurrentHashMap<NodeI
 **Fix:** Deploy one domain module per application. A compliance application uses `casehub-ops-compliance.jar` only. A deployment application uses `casehub-ops-deployment.jar` only.
 
 **Symptom:** Drift detected but node never re-provisioned — DRIFTED status appears in logs but no transition is planned.
-**Cause:** `TransitionPlanner` in `casehub-desiredstate` has no code path for `DRIFTED` — it handles `ABSENT`/`UNKNOWN` → PROVISION and `PRESENT`-not-in-desired → DEPROVISION only.
-**Fix:** Apply the one-line fix in `TransitionPlanner.plan()` — treat DRIFTED like ABSENT (add to `toAdd` list). Tracked in casehubio/casehub-desiredstate#38.
+**Cause:** `TransitionPlanner` in `casehub-desiredstate` previously had no code path for `DRIFTED` — it handled `ABSENT`/`UNKNOWN` → PROVISION and `PRESENT`-not-in-desired → DEPROVISION only.
+**Fix:** Fixed in casehubio/casehub-desiredstate#38 — `TransitionPlanner.plan()` now treats DRIFTED like ABSENT (`case DRIFTED, ABSENT, UNKNOWN -> true` in the provision switch). Config drift self-healing works for all domain modules.
 
 **Symptom:** `AgentCapability` constructor call fails with wrong argument count after eidos API update.
 **Cause:** eidos added a new field (`excludedDomains`) to `AgentCapability`. Binary incompatibility — existing code compiles against old API but fails at runtime.
@@ -252,7 +277,7 @@ Both deployment and compliance modules use an in-memory `ConcurrentHashMap<NodeI
 
 | Journey | Description | Chapters | Status |
 |---|---|---|---|
-| Desired-state ops domains | Implement desired-state management for four operational domains, validating the generic runtime | 4 | In progress |
+| Desired-state ops domains | Implement desired-state management for four operational domains, validating the generic runtime | 4 | ✅ Complete |
 
 ```mermaid
 flowchart LR
@@ -263,7 +288,7 @@ flowchart LR
   style C1 fill:#90EE90,color:#000
   style C2 fill:#90EE90,color:#000
   style C3 fill:#90EE90,color:#000
-  style C4 fill:#D3D3D3,color:#000
+  style C4 fill:#90EE90,color:#000
 ```
 
 ### §9.2 Chapter Index
@@ -273,7 +298,7 @@ flowchart LR
 | 1 | Infra PoC | Desired-state ops domains | L1, L2 | High, High | ✅ |
 | 2 | Deployment domain | Desired-state ops domains | L1, L3 | Medium, High | ✅ |
 | 3 | Compliance domain | Desired-state ops domains | L1, L4 | Medium, High | ✅ |
-| 4 | IoT domain | Desired-state ops domains | L1, L5 | Low, High | 🔲 |
+| 4 | IoT domain | Desired-state ops domains | L1, L5 | Low, High | ✅ |
 
 **Layer × Chapter matrix**
 
@@ -358,21 +383,22 @@ The system provides continuous compliance posture for six regulatory frameworks.
 
 ### Chapter 4 — IoT Domain
 
-**Journey:** Desired-state ops domains | **Sequence:** 4 of 4 | **Status:** 🔲
-**Delivered:** 🔲 pending | **Issues:** #4
+**Journey:** Desired-state ops domains | **Sequence:** 4 of 4 | **Status:** ✅
+**Delivered:** 2026-06-25 | **Issues:** #4 | **Blog:** `2026-06-25-mdp01-iot-desired-state-type-boundary.md`
 
 **What this delivers**
-🔲 IoT desired state — physical + logical device provisioning on top of the casehub-iot foundation.
+The system can declare IoT device topology (physical devices + logical configurations) as a desired-state graph, detect drift by normalizing capabilities across the YAML↔IoT API boundary, and provision configurations via DeviceProvider dispatch. Physical devices use `requiresHuman=true` for human-in-the-loop provisioning; logical configs are auto-provisioned.
 
 **Accountability gaps closed**
-🔲 at Chapter 4 close
+- IoT domain validation → proves the desiredstate SPIs work for physical + logical device management with two-node-type pattern
+- Type strategy confirmation → sealed hierarchy without wrapper is the right fit when variants differ structurally and in provisioning semantics
 
 **Layer Impact**
 
 | Layer | Delta |
 |---|---|
-| L1 Shared API | Low |
-| L5 IoT | High |
+| L1 Shared API | Low — `IoTNodeSpec` sealed interface, `PhysicalDeviceSpec`, `DeviceConfigSpec` |
+| L5 IoT | High — full SPI quad implementation |
 
 ---
 
@@ -410,6 +436,9 @@ Not closed here: no shared cross-domain abstractions — each domain's types are
 - `api/.../compliance/ComplianceControlSpec.java` — generic control spec with controlType discriminator and framework mappings
 - `api/.../compliance/EvidenceCollector.java` — SPI for configuration assertion checking per control type
 - `api/.../compliance/EvidenceResult.java` — sealed result: Pass, Fail, Unavailable
+- `api/.../iot/IoTNodeSpec.java` — sealed interface for IoT node types (physical device, device config)
+- `api/.../iot/PhysicalDeviceSpec.java` — physical device presence tracking (human-provisioned)
+- `api/.../iot/DeviceConfigSpec.java` — logical device configuration (auto-provisioned via DeviceProvider)
 
 #### Architectural decisions
 
@@ -662,11 +691,76 @@ Evidence-based compliance posture — evidence collection as provisioning, evide
 ### Layer — L5 IoT Domain
 
 **Participates in chapters:** C4
-**Architectural patterns:** 🔲 pending
+**Architectural patterns:** Sealed type dispatch, two-node-type model, capability normalization, provider routing
+**Design refs:** `docs/superpowers/specs/2026-06-24-iot-desired-state-design.md`
 **Issues:** #4
-**Completed:** 🔲 pending — casehub-iot foundation exists on 0.2-SNAPSHOT
+**Navigation:** `git log --grep="#4" --oneline`
+**Blog:** `2026-06-25-mdp01-iot-desired-state-type-boundary.md`
+**Completed:** 2026-06-25
 
-🔲 at Chapter 4 close — blocked on #4 implementation.
+#### What it adds
+
+**Before:** No IoT domain implementation — casehub-iot foundation provided device registry and provider APIs but no desired-state reconciliation.
+**After:** `IoTGoalCompiler` compiles YAML device topology into a `DesiredStateGraph` with two node types per physical device: a `PhysicalDeviceSpec` node (`requiresHuman=true`) and a `DeviceConfigSpec` node (auto-provisioned) with a dependency edge ensuring physical presence before configuration. `IoTNodeProvisioner` dispatches `DeviceCommand`s via `DeviceProvider` for config drift. `IoTActualStateAdapter` detects drift by normalizing capabilities across the YAML↔IoT API type boundary.
+
+What this layer adds:
+- **Two-node-type model** — physical device tracking (human-provisioned, presence-only) and logical configuration (auto-provisioned, capability commands). Dependency edge guarantees ordering. Forward-compatible with runtime WorkItem integration (casehubio/casehub-desiredstate#43).
+- **Capability normalization** — `CapabilityNormalizer` normalizes both desired and actual sides to a common representation (BigDecimal for numerics, String for enums, recursive Map normalization for Temperature). Ensures comparison works across YAML parsing types and IoT API types.
+- **Provider routing** — `IoTNodeProvisioner` resolves `DeviceProvider` by `providerId()` from the device registry, dispatches `DeviceCommand`s for each drifted capability.
+
+Not closed here: `IoTFaultPolicy` is no-op (needs operational feedback — #10). `requiresHuman=true` nodes are skipped by `SimpleTransitionExecutor` — WorkItem creation pending casehubio/casehub-desiredstate#43.
+
+#### Key files
+
+- `iot/.../IoTGoalCompiler.java` — YAML goals → DesiredStateGraph with two node types and dependency edges
+- `iot/.../IoTGoalLoader.java` — YAML loading with classpath-first resolution, filesystem fallback, directory merge
+- `iot/.../IoTActualStateAdapter.java` — DeviceRegistry-backed drift detection with normalized capability comparison
+- `iot/.../IoTNodeProvisioner.java` — sealed dispatch by spec type, provider routing, DeviceCommand dispatch per drifted capability
+- `iot/.../CapabilityNormalizer.java` — BigDecimal/enum/Temperature normalization with recursive Map handling
+- `iot/.../CapabilityCommandMapper.java` — capability key+value → DeviceCommand with CommandContext
+- `iot/.../IoTEventSource.java` — CDI async observer bridge: StateChangeEvent/ProviderStatusEvent → StateEvent stream
+- `iot/.../IoTFaultPolicy.java` — no-op placeholder pending operational feedback
+
+#### Key wiring
+
+**Two nodes per physical device.** `IoTGoalCompiler` emits `NodeId.of(deviceId)` for the physical device and `NodeId.of(deviceId + "-config")` for its configuration. The config node depends on the physical node via `Dependency`. Config-only devices (no physical tracking) emit a single config node.
+
+**Provider discovery via CDI.** `@Any Instance<DeviceProvider>` injected at construction. Providers are indexed by `providerId()` into a HashMap for O(1) lookup during provisioning.
+
+**EventSource bridges CDI async events.** `@ObservesAsync StateChangeEvent` and `@ObservesAsync ProviderStatusEvent` are translated to `StateEvent` emissions. Provider disconnection marks all tracked devices as `UNKNOWN`. Capability changes mark the config node as `DRIFTED`.
+
+#### Gotchas
+
+**Symptom:** Capability comparison reports drift when values are semantically equal — `22` (Integer from YAML) vs `22.0` (BigDecimal from IoT API).
+**Cause:** YAML parses bare numbers as `Integer`/`Long`. IoT Temperature uses `BigDecimal`. `BigDecimal.equals()` is scale-sensitive.
+**Fix:** `CapabilityNormalizer` converts all numerics to `BigDecimal.stripTrailingZeros()` on both sides before comparison.
+
+**Symptom:** YAML property `on: true` parsed as a boolean key `true` instead of string key `"on"`.
+**Cause:** YAML 1.1 treats bare `on`/`off`/`yes`/`no` as boolean literals.
+**Fix:** Renamed the capability key from `on` to `isOn` in the spec. Documented in design spec round 1.
+
+#### Architectural decisions
+
+**Why two node types rather than one with dynamic routing:** Reading `SimpleTransitionExecutor` bytecode revealed that `requiresHuman=true` returns `StepOutcome.Skipped` — the executor doesn't create WorkItems, it just skips. This means `requiresHuman` must be set at compile time per node, not dynamically per provisioner call. Two node types with an explicit dependency is forward-compatible — when the runtime adds WorkItem integration (#43), physical device tracking works automatically.
+
+**Why sealed hierarchy without wrapper (unlike infra):** Infra wraps `InfraNodeSpec` in `InfraDesiredNodeSpec` to carry `backendId` for backend routing. IoT has no backend routing — all devices provision through `DeviceProvider.dispatch()` resolved from the device's own `providerId()`. No wrapper needed.
+
+#### Pattern introduced
+
+Two-node-type model with dependency edge — when a domain entity has both a human-verified existence check and an automated configuration, split into two nodes with the config depending on the presence node.
+
+#### Pattern anchor
+
+`IoTGoalCompiler.compile()` — emits `PhysicalDeviceSpec` node + `DeviceConfigSpec` node with `Dependency(config, physical)`.
+
+#### Pattern to replicate
+
+1. Define a sealed interface extending `NodeSpec` in `api/` with one record per provisioning semantic (human vs automated)
+2. In GoalCompiler: emit two nodes per entity — presence node (`requiresHuman=true`) and config node (`requiresHuman=false`) — with a dependency from config to presence
+3. In NodeProvisioner: sealed switch dispatch, physical → `Failed("cannot auto-provision")`, config → dispatch commands
+4. In ActualStateAdapter: check device existence (ABSENT/PRESENT) for physical nodes, normalize and compare capabilities for config nodes
+5. Build a stateless normalizer that converts both YAML-parsed and API-sourced values to a common representation
+6. Bridge domain events to the EventSource via CDI `@ObservesAsync`
 
 ---
 
