@@ -13,7 +13,9 @@ final class CapabilityNormalizer {
     static Map<String, Object> normalize(Map<String, Object> capabilities) {
         var result = new LinkedHashMap<String, Object>();
         for (var entry : capabilities.entrySet()) {
-            result.put(entry.getKey(), normalizeValue(entry.getValue()));
+            if (entry.getValue() != null) {
+                result.put(entry.getKey(), normalizeValue(entry.getValue()));
+            }
         }
         return Map.copyOf(result);
     }

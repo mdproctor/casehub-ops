@@ -9,16 +9,11 @@ import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.iot.api.DeviceClass;
 import io.casehub.iot.api.DeviceEntity;
 import io.casehub.iot.api.SwitchDevice;
-import io.casehub.iot.api.ThermostatDevice;
-import io.casehub.iot.api.Temperature;
-import io.casehub.iot.api.Temperature.TemperatureUnit;
-import io.casehub.iot.api.ThermostatMode;
 import io.casehub.iot.api.spi.DeviceRegistry;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.PhysicalDeviceSpec;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
