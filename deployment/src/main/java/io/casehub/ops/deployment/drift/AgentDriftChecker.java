@@ -2,21 +2,19 @@ package io.casehub.ops.deployment.drift;
 
 import io.casehub.desiredstate.api.NodeSpec;
 import io.casehub.desiredstate.api.NodeStatus;
-import io.casehub.eidos.api.AgentDescriptor;
+import io.casehub.eidos.api.AgentDescriptorComparator;
 import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.ops.api.deployment.AgentNodeSpec;
 import io.casehub.ops.api.deployment.NodeDriftChecker;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 
-import java.util.Optional;
-
-/**
- * Checks drift for agent nodes by comparing registered capabilities against the spec.
- * Extracted from DeploymentActualStateAdapter.checkAgentStatus() and capabilitiesMatch().
- */
 @ApplicationScoped
 public class AgentDriftChecker implements NodeDriftChecker {
+
+    private static final Logger LOG = Logger.getLogger(AgentDriftChecker.class);
+
     private final AgentRegistry agentRegistry;
 
     @Inject
@@ -35,13 +33,22 @@ public class AgentDriftChecker implements NodeDriftChecker {
             return NodeStatus.UNKNOWN;
         }
 
-        Optional<AgentDescriptor> actual = agentRegistry.findById(agentSpec.agentId(), tenancyId);
+        var actual = agentRegistry.findById(agentSpec.agentId(), tenancyId);
         if (actual.isEmpty()) {
             return NodeStatus.ABSENT;
         }
 
-        var desired = agentSpec.capabilities().stream().map(c -> c.name()).sorted().toList();
-        var existing = actual.get().capabilities().stream().map(c -> c.name()).sorted().toList();
-        return desired.equals(existing) ? NodeStatus.PRESENT : NodeStatus.DRIFTED;
+        var desired = agentSpec.toDescriptor(tenancyId);
+        var result = AgentDescriptorComparator.compare(desired, actual.get());
+
+        if (!result.matches()) {
+            for (var drift : result.drifts()) {
+                LOG.debugf("agent %s: %s drifted [%s → %s]",
+                        agentSpec.agentId(), drift.field(), drift.desiredValue(), drift.actualValue());
+            }
+            return NodeStatus.DRIFTED;
+        }
+
+        return NodeStatus.PRESENT;
     }
 }

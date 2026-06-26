@@ -3,6 +3,7 @@ package io.casehub.ops.deployment.drift;
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.eidos.api.AgentCapability;
 import io.casehub.eidos.api.AgentDescriptor;
+import io.casehub.eidos.api.AgentDisposition;
 import io.casehub.eidos.api.AgentQuery;
 import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.ops.api.deployment.AgentNodeSpec;
@@ -79,6 +80,70 @@ class AgentDriftCheckerTest {
                 null, null, null, null, null, null, null, null, null, null, null);
 
         assertEquals(NodeStatus.UNKNOWN, checker.check(spec, TENANCY_ID));
+    }
+
+    @Test
+    void agentDrifted_dispositionMismatch() {
+        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var disp1 = new AgentDisposition("collaborative", "principled", "measured", "semi-autonomous", "compromising", false);
+        var descriptor = new AgentDescriptor(
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
+                "domain", "slot", "disp", Map.of(), "worker",
+                List.of(cap), disp1, "US", "policy", TENANCY_ID, null);
+        agentRegistry.register(descriptor);
+
+        var disp2 = new AgentDisposition("independent", "principled", "measured", "semi-autonomous", "compromising", false);
+        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp2, "US", "policy", null, List.of());
+
+        assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));
+    }
+
+    @Test
+    void agentDrifted_briefingMismatch() {
+        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var descriptor = new AgentDescriptor(
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
+                "domain", "slot", "disp", Map.of(), "worker",
+                List.of(cap), null, "US", "policy", TENANCY_ID, "Original briefing");
+        agentRegistry.register(descriptor);
+
+        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), null, "US", "policy", "Changed briefing", List.of());
+
+        assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));
+    }
+
+    @Test
+    void agentDrifted_capabilitySubFieldMismatch() {
+        var capDesired = new AgentCapability("cap-a", 0.85, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var capActual = new AgentCapability("cap-a", 0.50, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var descriptor = new AgentDescriptor(
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
+                "domain", "slot", "disp", Map.of(), "worker",
+                List.of(capActual), null, "US", "policy", TENANCY_ID, null);
+        agentRegistry.register(descriptor);
+
+        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(capDesired), null, "US", "policy", null, List.of());
+
+        assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));
+    }
+
+    @Test
+    void agentPresent_allFieldsMatch() {
+        var cap = new AgentCapability("cap-a", 0.85, 2000L, "medium", List.of("text"), List.of("text"), List.of("tag"), Map.of("java", 0.95), Set.of("cobol"));
+        var disp = new AgentDisposition("collaborative", "principled", "measured", "semi-autonomous", "compromising", false);
+        var descriptor = new AgentDescriptor(
+                "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
+                "domain", "slot", "disp", Map.of(), "worker",
+                List.of(cap), disp, "US", "policy", TENANCY_ID, "briefing");
+        agentRegistry.register(descriptor);
+
+        var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
+                "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy", "briefing", List.of());
+
+        assertEquals(NodeStatus.PRESENT, checker.check(spec, TENANCY_ID));
     }
 
     // Test stub
