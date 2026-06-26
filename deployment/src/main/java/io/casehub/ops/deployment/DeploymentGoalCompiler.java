@@ -42,6 +42,7 @@ public class DeploymentGoalCompiler implements GoalCompiler<DeploymentGoals> {
         compileEntries(goals.channels(), nodes, dependencies);
         compileEntries(resolveCaseTypes(goals.caseTypes()), nodes, dependencies);
         compileEntries(goals.trust(), nodes, dependencies);
+        compileEntries(goals.endpoints(), nodes, dependencies);
 
         return factory.of(nodes, dependencies);
     }

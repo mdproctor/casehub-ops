@@ -53,13 +53,15 @@ public class DeploymentGoalLoader {
         var channels = new ArrayList<GoalEntry<ChannelNodeSpec>>();
         var caseTypes = new ArrayList<GoalEntry<CaseTypeNodeSpec>>();
         var trust = new ArrayList<GoalEntry<TrustPolicyNodeSpec>>();
+        var endpoints = new ArrayList<GoalEntry<EndpointNodeSpec>>();
         for (var f : fragments) {
             agents.addAll(f.agents());
             channels.addAll(f.channels());
             caseTypes.addAll(f.caseTypes());
             trust.addAll(f.trust());
+            endpoints.addAll(f.endpoints());
         }
-        return new DeploymentGoals(agents, channels, caseTypes, trust);
+        return new DeploymentGoals(agents, channels, caseTypes, trust, endpoints);
     }
 
     private InputStream resolveStream(String path) {

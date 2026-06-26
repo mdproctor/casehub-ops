@@ -14,7 +14,6 @@ public class DeploymentActualStateAdapter implements ActualStateAdapter {
 
     private final Map<String, NodeDriftChecker> checkers;
     private final SpecHashStore specHashStore;
-    private final String tenancyId;
 
     @Inject
     public DeploymentActualStateAdapter(
@@ -25,34 +24,27 @@ public class DeploymentActualStateAdapter implements ActualStateAdapter {
             this.checkers.put(checker.nodeType(), checker);
         }
         this.specHashStore = specHashStore;
-        this.tenancyId = "default";
     }
 
     // Test constructor
     DeploymentActualStateAdapter(List<NodeDriftChecker> driftCheckers, SpecHashStore specHashStore) {
-        this(driftCheckers, specHashStore, "default");
-    }
-
-    // Test constructor with custom tenancyId
-    DeploymentActualStateAdapter(List<NodeDriftChecker> driftCheckers, SpecHashStore specHashStore, String tenancyId) {
         this.checkers = new HashMap<>();
         for (var checker : driftCheckers) {
             this.checkers.put(checker.nodeType(), checker);
         }
         this.specHashStore = specHashStore;
-        this.tenancyId = tenancyId;
     }
 
     @Override
-    public ActualState readActual(DesiredStateGraph desired) {
+    public ActualState readActual(DesiredStateGraph desired, String tenancyId) {
         Map<NodeId, NodeStatus> statuses = new HashMap<>();
         for (var node : desired.nodes().values()) {
-            statuses.put(node.id(), checkNode(node));
+            statuses.put(node.id(), checkNode(node, tenancyId));
         }
         return new ActualState(statuses);
     }
 
-    private NodeStatus checkNode(DesiredNode node) {
+    private NodeStatus checkNode(DesiredNode node, String tenancyId) {
         // Layer 1: external — does the node exist and match in the foundation module?
         NodeDriftChecker checker = checkers.get(node.type().value());
         NodeStatus external = (checker != null)

@@ -48,7 +48,7 @@ public class InfraActualStateAdapter implements ActualStateAdapter {
     }
 
     @Override
-    public ActualState readActual(DesiredStateGraph desired) {
+    public ActualState readActual(DesiredStateGraph desired, String tenancyId) {
         Map<NodeId, NodeStatus> statuses = new HashMap<>();
         for (var node : desired.nodes().values()) {
             statuses.put(node.id(), readNodeStatus(node));

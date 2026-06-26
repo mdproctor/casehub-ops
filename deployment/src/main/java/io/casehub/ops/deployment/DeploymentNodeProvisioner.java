@@ -15,6 +15,7 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
     private final ChannelProvisionHandler channelHandler;
     private final CaseTypeProvisionHandler caseTypeHandler;
     private final TrustPolicyProvisionHandler trustHandler;
+    private final EndpointProvisionHandler endpointHandler;
     private final SpecHashStore specHashStore;
 
     @Inject
@@ -24,11 +25,13 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
             ChannelProvisionHandler channelHandler,
             CaseTypeProvisionHandler caseTypeHandler,
             TrustPolicyProvisionHandler trustHandler,
+            EndpointProvisionHandler endpointHandler,
             SpecHashStore specHashStore) {
         this.agentHandler = new AgentProvisionHandler(agentRegistry, providerConfigStore);
         this.channelHandler = channelHandler;
         this.caseTypeHandler = caseTypeHandler;
         this.trustHandler = trustHandler;
+        this.endpointHandler = endpointHandler;
         this.specHashStore = specHashStore;
     }
 
@@ -42,6 +45,7 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
             case ChannelNodeSpec s -> channelHandler.provision(s, context);
             case CaseTypeNodeSpec s -> caseTypeHandler.provision(s, context);
             case TrustPolicyNodeSpec s -> trustHandler.provision(s, context);
+            case EndpointNodeSpec s -> endpointHandler.provision(s, context);
         };
         if (result instanceof ProvisionResult.Success) {
             specHashStore.record(node.id(), node.spec());
@@ -59,6 +63,7 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
             case ChannelNodeSpec s -> channelHandler.deprovision(s, context);
             case CaseTypeNodeSpec s -> caseTypeHandler.deprovision(s, context);
             case TrustPolicyNodeSpec s -> trustHandler.deprovision(s, context);
+            case EndpointNodeSpec s -> endpointHandler.deprovision(s, context);
         };
         if (result instanceof DeprovisionResult.Success) {
             specHashStore.remove(node.id());

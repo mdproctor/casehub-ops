@@ -23,7 +23,7 @@ class ComplianceActualStateAdapterTest {
         specHashStore = new ComplianceSpecHashStore();
         evidenceService = new StubEvidenceService();
         graphFactory = new DefaultDesiredStateGraphFactory();
-        adapter = new ComplianceActualStateAdapter(evidenceService, specHashStore, "default");
+        adapter = new ComplianceActualStateAdapter(evidenceService, specHashStore);
     }
 
     @Test
@@ -32,7 +32,7 @@ class ComplianceActualStateAdapterTest {
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.ABSENT);
     }
 
@@ -45,7 +45,7 @@ class ComplianceActualStateAdapterTest {
         specHashStore.record(NodeId.of("enc"), spec);
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.PRESENT);
     }
 
@@ -60,7 +60,7 @@ class ComplianceActualStateAdapterTest {
                 "enc", "ENCRYPTION_AT_REST", "Changed", "D", List.of(), 30, false, Map.of());
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), specNew, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
     }
 
@@ -72,7 +72,7 @@ class ComplianceActualStateAdapterTest {
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
     }
 
@@ -84,7 +84,7 @@ class ComplianceActualStateAdapterTest {
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
     }
 
@@ -96,7 +96,7 @@ class ComplianceActualStateAdapterTest {
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
         var graph = graphFactory.of(List.of(node), List.of());
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
     }
 

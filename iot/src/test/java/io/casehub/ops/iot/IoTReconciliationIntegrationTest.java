@@ -83,7 +83,7 @@ class IoTReconciliationIntegrationTest {
         var planner = new TransitionPlanner();
 
         var graph = compiler.compile(goals, FACTORY);
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("thermo-1"))).contains(NodeStatus.ABSENT);
         assertThat(actual.statusOf(NodeId.of("light-1"))).contains(NodeStatus.PRESENT);

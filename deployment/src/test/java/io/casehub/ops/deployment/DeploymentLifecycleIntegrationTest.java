@@ -6,6 +6,8 @@ import io.casehub.eidos.api.*;
 import io.casehub.ops.api.deployment.*;
 import io.casehub.ops.deployment.drift.*;
 import io.casehub.ops.deployment.handler.*;
+import io.casehub.platform.api.endpoints.*;
+import io.casehub.platform.api.path.Path;
 import io.casehub.qhorus.api.channel.ChannelSemantic;
 import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.runtime.channel.Channel;
@@ -30,6 +32,7 @@ class DeploymentLifecycleIntegrationTest {
 
     private StubAgentRegistry agentRegistry;
     private StubChannelOperations channelOps;
+    private StubEndpointRegistry endpointRegistry;
     private CaseTypeProvisionHandler caseTypeHandler;
     private DeploymentTrustRoutingPolicyProvider trustProvider;
     private SpecHashStore specHashStore;
@@ -42,6 +45,7 @@ class DeploymentLifecycleIntegrationTest {
         // Create stubs
         agentRegistry = new StubAgentRegistry();
         channelOps = new StubChannelOperations();
+        endpointRegistry = new StubEndpointRegistry();
         providerConfigStore = new DeploymentProviderConfigStore();
         caseTypeHandler = new CaseTypeProvisionHandler();
         trustProvider = new DeploymentTrustRoutingPolicyProvider();
@@ -54,6 +58,7 @@ class DeploymentLifecycleIntegrationTest {
         var channelChecker = new ChannelDriftChecker(channelOps::findByName);
         var caseTypeChecker = new CaseTypeDriftChecker(caseTypeHandler);
         var trustChecker = new TrustPolicyDriftChecker(trustProvider);
+        var endpointChecker = new EndpointDriftChecker(endpointRegistry);
 
         // Wire everything
         compiler = new DeploymentGoalCompiler();
@@ -63,11 +68,11 @@ class DeploymentLifecycleIntegrationTest {
                 new ChannelProvisionHandler(channelOps),
                 caseTypeHandler,
                 new TrustPolicyProvisionHandler(trustProvider),
+                new EndpointProvisionHandler(endpointRegistry),
                 specHashStore);
         adapter = new DeploymentActualStateAdapter(
-                List.of(agentChecker, channelChecker, caseTypeChecker, trustChecker),
-                specHashStore,
-                TENANCY_ID);
+                List.of(agentChecker, channelChecker, caseTypeChecker, trustChecker, endpointChecker),
+                specHashStore);
         eventSource = new DeploymentEventSource();
         faultPolicy = new DeploymentFaultPolicy();
         graphFactory = new DefaultDesiredStateGraphFactory();
@@ -75,7 +80,7 @@ class DeploymentLifecycleIntegrationTest {
 
     @Test
     void fullLifecycle_declare_compile_provision_readState() {
-        // Declare 4 nodes (one of each type)
+        // Declare 5 nodes (one of each type including endpoint)
         var agentCap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var agentDisp = AgentDisposition.builder().delegation(false).build();
         var claudonyConfig = new ProviderConfig("claudony", Map.of("tools", "read,write"));
@@ -89,15 +94,30 @@ class DeploymentLifecycleIntegrationTest {
 
         var trustSpec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
 
+        var endpointSpec = new EndpointNodeSpec(
+                "test/kafka-stream",
+                EndpointType.SERVICE,
+                EndpointProtocol.KAFKA,
+                Map.of(EndpointPropertyKeys.TOPIC, "test.events"),
+                null,
+                Set.of(EndpointCapability.RECEIVE));
+
         var deploymentGoals = new DeploymentGoals(
-                List.of(new GoalEntry<>(agentSpec, List.of())),
+                List.of(new GoalEntry<>(agentSpec, List.of("test/kafka-stream"))),
                 List.of(new GoalEntry<>(channelSpec, List.of())),
                 List.of(new GoalEntry<>(caseTypeSpec, List.of())),
-                List.of(new GoalEntry<>(trustSpec, List.of())));
+                List.of(new GoalEntry<>(trustSpec, List.of())),
+                List.of(new GoalEntry<>(endpointSpec, List.of())));
 
         // Compile
         var desired = compiler.compile(deploymentGoals, graphFactory);
-        assertThat(desired.nodes()).hasSize(4);
+        assertThat(desired.nodes()).hasSize(5);
+        assertThat(desired.dependencies()).hasSize(1);
+
+        // Verify cross-type dependency: agent → endpoint
+        var dep = desired.dependencies().iterator().next();
+        assertThat(dep.from()).isEqualTo(NodeId.of("agent-1"));
+        assertThat(dep.to()).isEqualTo(NodeId.of("test/kafka-stream"));
 
         // Provision all
         var provisionContext = new ProvisionContext(TENANCY_ID, desired);
@@ -109,8 +129,8 @@ class DeploymentLifecycleIntegrationTest {
         }
 
         // Read actual state
-        var actual = adapter.readActual(desired);
-        assertThat(actual.statuses()).hasSize(4);
+        var actual = adapter.readActual(desired, TENANCY_ID);
+        assertThat(actual.statuses()).hasSize(5);
         for (var status : actual.statuses().values()) {
             assertThat(status).isEqualTo(NodeStatus.PRESENT);
         }
@@ -144,6 +164,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(new GoalEntry<>(agentSpec, List.of())),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of());
 
         var desired = compiler.compile(deploymentGoals, graphFactory);
@@ -159,12 +180,59 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(new GoalEntry<>(modifiedSpec, List.of())),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of());
         var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
 
         // Read actual state — should detect drift
-        var actual = adapter.readActual(modifiedDesired);
+        var actual = adapter.readActual(modifiedDesired, TENANCY_ID);
         var status = actual.statuses().get(NodeId.of("agent-drift"));
+        assertThat(status).isEqualTo(NodeStatus.DRIFTED);
+    }
+
+    @Test
+    void driftDetection_endpointPropertyChangeReportsDrifted() {
+        // Create and provision a KAFKA endpoint
+        var endpointSpec = new EndpointNodeSpec(
+                "test/kafka-drift",
+                EndpointType.SERVICE,
+                EndpointProtocol.KAFKA,
+                Map.of(EndpointPropertyKeys.TOPIC, "original.topic"),
+                null,
+                Set.of(EndpointCapability.RECEIVE));
+
+        var deploymentGoals = new DeploymentGoals(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new GoalEntry<>(endpointSpec, List.of())));
+
+        var desired = compiler.compile(deploymentGoals, graphFactory);
+        var provisionContext = new ProvisionContext(TENANCY_ID, desired);
+        var node = desired.nodes().values().iterator().next();
+        var result = provisioner.provision(node, provisionContext);
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+
+        // Compile a modified endpoint (different topic = different properties)
+        var modifiedSpec = new EndpointNodeSpec(
+                "test/kafka-drift",
+                EndpointType.SERVICE,
+                EndpointProtocol.KAFKA,
+                Map.of(EndpointPropertyKeys.TOPIC, "modified.topic"),
+                null,
+                Set.of(EndpointCapability.RECEIVE));
+        var modifiedGoals = new DeploymentGoals(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new GoalEntry<>(modifiedSpec, List.of())));
+        var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
+
+        // Read actual state — should detect drift
+        var actual = adapter.readActual(modifiedDesired, TENANCY_ID);
+        var status = actual.statuses().get(NodeId.of("test/kafka-drift"));
         assertThat(status).isEqualTo(NodeStatus.DRIFTED);
     }
 
@@ -284,6 +352,34 @@ class DeploymentLifecycleIntegrationTest {
                 }
             }
             return null;
+        }
+    }
+
+    static class StubEndpointRegistry implements EndpointRegistry {
+        private final Map<String, EndpointDescriptor> endpoints = new ConcurrentHashMap<>();
+
+        private String key(Path path, String tenancyId) {
+            return path.value() + ":" + tenancyId;
+        }
+
+        @Override
+        public void register(EndpointDescriptor endpoint) {
+            endpoints.put(key(endpoint.path(), endpoint.tenancyId()), endpoint);
+        }
+
+        @Override
+        public Optional<EndpointDescriptor> resolve(Path path, String tenancyId) {
+            return Optional.ofNullable(endpoints.get(key(path, tenancyId)));
+        }
+
+        @Override
+        public List<EndpointDescriptor> discover(EndpointQuery query) {
+            return new ArrayList<>(endpoints.values());
+        }
+
+        @Override
+        public void deregister(Path path, String tenancyId) {
+            endpoints.remove(key(path, tenancyId));
         }
     }
 }

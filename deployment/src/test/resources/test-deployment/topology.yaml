@@ -24,3 +24,12 @@ trust:
       blendFactor: 0.5
       bootstrapEscalationRequired: false
     dependsOn: []
+endpoints:
+  - spec:
+      path: test/kafka-stream
+      type: SERVICE
+      protocol: KAFKA
+      properties:
+        topic: test.events
+      capabilities: [RECEIVE]
+    dependsOn: []

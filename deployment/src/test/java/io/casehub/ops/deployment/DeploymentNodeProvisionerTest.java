@@ -5,6 +5,8 @@ import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.eidos.api.*;
 import io.casehub.ops.api.deployment.*;
 import io.casehub.ops.deployment.handler.*;
+import io.casehub.platform.api.endpoints.*;
+import io.casehub.platform.api.path.Path;
 import io.casehub.qhorus.api.channel.ChannelSemantic;
 import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.runtime.channel.Channel;
@@ -23,6 +25,7 @@ class DeploymentNodeProvisionerTest {
     private DeploymentNodeProvisioner provisioner;
     private StubAgentRegistry agentRegistry;
     private StubChannelOperations channelOps;
+    private StubEndpointRegistry endpointRegistry;
     private SpecHashStore specHashStore;
     private DesiredStateGraph emptyGraph;
 
@@ -30,6 +33,7 @@ class DeploymentNodeProvisionerTest {
     void setUp() {
         agentRegistry = new StubAgentRegistry();
         channelOps = new StubChannelOperations();
+        endpointRegistry = new StubEndpointRegistry();
         specHashStore = new SpecHashStore();
         var providerConfigStore = new DeploymentProviderConfigStore();
         var caseTypeHandler = new CaseTypeProvisionHandler();
@@ -43,6 +47,7 @@ class DeploymentNodeProvisionerTest {
                 new ChannelProvisionHandler(channelOps),
                 caseTypeHandler,
                 trustHandler,
+                new EndpointProvisionHandler(endpointRegistry),
                 specHashStore);
     }
 
@@ -180,6 +185,34 @@ class DeploymentNodeProvisionerTest {
         @Override
         public Channel setAdminInstances(UUID channelId, String adminInstances) {
             return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+        }
+    }
+
+    static class StubEndpointRegistry implements EndpointRegistry {
+        private final Map<String, EndpointDescriptor> endpoints = new ConcurrentHashMap<>();
+
+        private String key(Path path, String tenancyId) {
+            return path.value() + ":" + tenancyId;
+        }
+
+        @Override
+        public void register(EndpointDescriptor endpoint) {
+            endpoints.put(key(endpoint.path(), endpoint.tenancyId()), endpoint);
+        }
+
+        @Override
+        public Optional<EndpointDescriptor> resolve(Path path, String tenancyId) {
+            return Optional.ofNullable(endpoints.get(key(path, tenancyId)));
+        }
+
+        @Override
+        public List<EndpointDescriptor> discover(EndpointQuery query) {
+            return new ArrayList<>(endpoints.values());
+        }
+
+        @Override
+        public void deregister(Path path, String tenancyId) {
+            endpoints.remove(key(path, tenancyId));
         }
     }
 }

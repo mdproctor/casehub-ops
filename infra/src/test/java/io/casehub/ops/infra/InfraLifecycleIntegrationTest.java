@@ -112,7 +112,7 @@ class InfraLifecycleIntegrationTest {
         assertThat(result).isInstanceOf(ProvisionResult.Success.class);
 
         // READ STATE
-        var actualState = stateAdapter.readActual(graph);
+        var actualState = stateAdapter.readActual(graph, "tenant-1");
         assertThat(actualState.statusOf(NodeId.of("ns1"))).contains(NodeStatus.PRESENT);
     }
 
@@ -145,7 +145,7 @@ class InfraLifecycleIntegrationTest {
         }
 
         // READ STATE: all 3 should be PRESENT
-        var actualState = stateAdapter.readActual(graph);
+        var actualState = stateAdapter.readActual(graph, "tenant-1");
         assertThat(actualState.statusOf(NodeId.of("ns1"))).contains(NodeStatus.PRESENT);
         assertThat(actualState.statusOf(NodeId.of("d1"))).contains(NodeStatus.PRESENT);
         assertThat(actualState.statusOf(NodeId.of("s1"))).contains(NodeStatus.PRESENT);
@@ -219,7 +219,7 @@ class InfraLifecycleIntegrationTest {
         }
 
         // READ STATE: all 4 should be PRESENT
-        var actualState = stateAdapter.readActual(graph);
+        var actualState = stateAdapter.readActual(graph, "tenant-1");
         assertThat(actualState.statusOf(NodeId.of("ns1"))).contains(NodeStatus.PRESENT);
         assertThat(actualState.statusOf(NodeId.of("d1"))).contains(NodeStatus.PRESENT);
         assertThat(actualState.statusOf(NodeId.of("s1"))).contains(NodeStatus.PRESENT);
@@ -236,7 +236,7 @@ class InfraLifecycleIntegrationTest {
         var graph = compiler.compile(goals, GRAPH_FACTORY);
 
         // READ STATE without provisioning -> UNKNOWN (via ResourceStatus.UNKNOWN mapping)
-        var actualState = stateAdapter.readActual(graph);
+        var actualState = stateAdapter.readActual(graph, "tenant-1");
         assertThat(actualState.statusOf(NodeId.of("ns1"))).contains(NodeStatus.UNKNOWN);
     }
 }

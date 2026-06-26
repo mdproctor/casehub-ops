@@ -27,7 +27,7 @@ public class IoTActualStateAdapter implements ActualStateAdapter {
     }
 
     @Override
-    public ActualState readActual(DesiredStateGraph desired) {
+    public ActualState readActual(DesiredStateGraph desired, String tenancyId) {
         Map<NodeId, NodeStatus> statuses = new HashMap<>();
         for (var entry : desired.nodes().entrySet()) {
             DesiredNode node = entry.getValue();

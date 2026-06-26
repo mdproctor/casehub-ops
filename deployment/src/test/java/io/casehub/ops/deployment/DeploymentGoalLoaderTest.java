@@ -31,6 +31,7 @@ class DeploymentGoalLoaderTest {
         assertThat(goals.channels()).hasSize(1);
         assertThat(goals.caseTypes()).hasSize(1);
         assertThat(goals.trust()).hasSize(1);
+        assertThat(goals.endpoints()).hasSize(1);
         assertThat(goals.agents().get(0).spec().agentId()).isEqualTo("test-agent");
     }
 
@@ -52,10 +53,10 @@ class DeploymentGoalLoaderTest {
     void mergesConcatenatesLists() {
         var goals1 = new DeploymentGoals(
                 List.of(new GoalEntry<>(minimalAgent("a1"), List.of())),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
         var goals2 = new DeploymentGoals(
                 List.of(new GoalEntry<>(minimalAgent("a2"), List.of())),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
         var merged = loader.merge(goals1, goals2);
         assertThat(merged.agents()).hasSize(2);
     }
@@ -73,6 +74,16 @@ class DeploymentGoalLoaderTest {
         assertThatThrownBy(() -> loader.loadDirectory(file.toString()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Not a directory");
+    }
+
+    @Test
+    void loadsEndpointFromYaml() {
+        DeploymentGoals goals = loader.load("test-deployment/topology.yaml");
+        assertThat(goals.endpoints()).hasSize(1);
+        var endpoint = goals.endpoints().get(0).spec();
+        assertThat(endpoint.path()).isEqualTo("test/kafka-stream");
+        assertThat(endpoint.protocol()).isEqualTo(io.casehub.platform.api.endpoints.EndpointProtocol.KAFKA);
+        assertThat(endpoint.properties()).containsEntry(io.casehub.platform.api.endpoints.EndpointPropertyKeys.TOPIC, "test.events");
     }
 
     private AgentNodeSpec minimalAgent(String id) {

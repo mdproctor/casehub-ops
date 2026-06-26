@@ -36,7 +36,7 @@ class IoTActualStateAdapterTest {
         var adapter = new IoTActualStateAdapter(registry);
 
         var graph = singleConfigGraph("sw-1", DeviceClass.SWITCH, Map.of("isOn", true));
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("sw-1-config"))).contains(NodeStatus.PRESENT);
     }
@@ -51,7 +51,7 @@ class IoTActualStateAdapterTest {
         var adapter = new IoTActualStateAdapter(registry);
 
         var graph = singleConfigGraph("sw-1", DeviceClass.SWITCH, Map.of("isOn", true));
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("sw-1-config"))).contains(NodeStatus.DRIFTED);
     }
@@ -62,7 +62,7 @@ class IoTActualStateAdapterTest {
         var adapter = new IoTActualStateAdapter(registry);
 
         var graph = singlePhysicalGraph("sw-1", DeviceClass.SWITCH);
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("sw-1"))).contains(NodeStatus.ABSENT);
     }
@@ -77,7 +77,7 @@ class IoTActualStateAdapterTest {
         var adapter = new IoTActualStateAdapter(registry);
 
         var graph = singlePhysicalGraph("sw-1", DeviceClass.SWITCH);
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("sw-1"))).contains(NodeStatus.PRESENT);
     }
@@ -92,7 +92,7 @@ class IoTActualStateAdapterTest {
         var adapter = new IoTActualStateAdapter(registry);
 
         var graph = singlePhysicalGraph("sw-1", DeviceClass.THERMOSTAT);
-        var actual = adapter.readActual(graph);
+        var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("sw-1"))).contains(NodeStatus.DRIFTED);
     }

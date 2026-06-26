@@ -39,6 +39,7 @@ class DeploymentGoalCompilerTest {
                 List.of(new GoalEntry<>(agent, List.of())),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -58,6 +59,7 @@ class DeploymentGoalCompilerTest {
         var goals = new DeploymentGoals(
                 List.of(),
                 List.of(new GoalEntry<>(channel, List.of())),
+                List.of(),
                 List.of(),
                 List.of());
 
@@ -85,6 +87,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of(),
                 List.of(new GoalEntry<>(caseType, List.of())),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -111,7 +114,8 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new GoalEntry<>(trustPolicy, List.of())));
+                List.of(new GoalEntry<>(trustPolicy, List.of())),
+                List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
 
@@ -130,6 +134,7 @@ class DeploymentGoalCompilerTest {
         var goals = new DeploymentGoals(
                 List.of(new GoalEntry<>(agent, List.of("work-queue"))),
                 List.of(new GoalEntry<>(channel, List.of())),
+                List.of(),
                 List.of(),
                 List.of());
 
@@ -168,7 +173,8 @@ class DeploymentGoalCompilerTest {
                 List.of(new GoalEntry<>(agent, List.of("work-queue"))),
                 List.of(new GoalEntry<>(channel, List.of())),
                 List.of(new GoalEntry<>(caseType, List.of())),
-                List.of(new GoalEntry<>(trustPolicy, List.of())));
+                List.of(new GoalEntry<>(trustPolicy, List.of())),
+                List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
 
@@ -189,6 +195,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -206,6 +213,7 @@ class DeploymentGoalCompilerTest {
         var goals = new DeploymentGoals(
                 List.of(), List.of(),
                 List.of(new GoalEntry<>(caseType, List.of())),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -228,6 +236,7 @@ class DeploymentGoalCompilerTest {
         var goals = new DeploymentGoals(
                 List.of(), List.of(),
                 List.of(new GoalEntry<>(caseType, List.of())),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -246,6 +255,7 @@ class DeploymentGoalCompilerTest {
         var goals = new DeploymentGoals(
                 List.of(), List.of(),
                 List.of(new GoalEntry<>(caseType, List.of())),
+                List.of(),
                 List.of());
 
         DesiredStateGraph graph = compiler.compile(goals, factory);
@@ -271,3 +281,4 @@ class DeploymentGoalCompilerTest {
                 null, null, null, null);
     }
 }
+

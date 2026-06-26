@@ -12,7 +12,6 @@ public class ComplianceActualStateAdapter implements ActualStateAdapter {
 
     private final ComplianceEvidenceService evidenceService;
     private final ComplianceSpecHashStore specHashStore;
-    private final String tenancyId;
 
     @Inject
     public ComplianceActualStateAdapter(
@@ -20,28 +19,18 @@ public class ComplianceActualStateAdapter implements ActualStateAdapter {
             ComplianceSpecHashStore specHashStore) {
         this.evidenceService = evidenceService;
         this.specHashStore = specHashStore;
-        this.tenancyId = "default";
-    }
-
-    ComplianceActualStateAdapter(
-            ComplianceEvidenceService evidenceService,
-            ComplianceSpecHashStore specHashStore,
-            String tenancyId) {
-        this.evidenceService = evidenceService;
-        this.specHashStore = specHashStore;
-        this.tenancyId = tenancyId;
     }
 
     @Override
-    public ActualState readActual(DesiredStateGraph desired) {
+    public ActualState readActual(DesiredStateGraph desired, String tenancyId) {
         Map<NodeId, NodeStatus> statuses = new HashMap<>();
         for (var node : desired.nodes().values()) {
-            statuses.put(node.id(), checkNode(node));
+            statuses.put(node.id(), checkNode(node, tenancyId));
         }
         return new ActualState(statuses);
     }
 
-    private NodeStatus checkNode(DesiredNode node) {
+    private NodeStatus checkNode(DesiredNode node, String tenancyId) {
         ComplianceControlSpec spec = (ComplianceControlSpec) node.spec();
         ControlEvidenceStatus status = evidenceService.evidenceStatus(spec, tenancyId);
 

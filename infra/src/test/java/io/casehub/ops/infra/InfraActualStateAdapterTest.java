@@ -119,7 +119,7 @@ class InfraActualStateAdapterTest {
                 infraNode("ns-1", "terraform"),
                 infraNode("ns-2", "standalone"));
 
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statuses()).hasSize(2);
         assertThat(actual.statusOf(NodeId.of("ns-1"))).hasValue(NodeStatus.PRESENT);
@@ -134,7 +134,7 @@ class InfraActualStateAdapterTest {
 
         var graph = graphOf(infraNode("ns-1", "terraform"));
 
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("ns-1"))).hasValue(NodeStatus.PRESENT);
     }
@@ -147,7 +147,7 @@ class InfraActualStateAdapterTest {
 
         var graph = graphOf(infraNode("ns-1", "terraform"));
 
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("ns-1"))).hasValue(NodeStatus.ABSENT);
     }
@@ -160,7 +160,7 @@ class InfraActualStateAdapterTest {
 
         var graph = graphOf(infraNode("ns-1", "terraform"));
 
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("ns-1"))).hasValue(NodeStatus.DRIFTED);
     }
@@ -173,7 +173,7 @@ class InfraActualStateAdapterTest {
 
         var graph = graphOf(infraNode("ns-broken", "terraform"));
 
-        ActualState actual = adapter.readActual(graph);
+        ActualState actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("ns-broken"))).hasValue(NodeStatus.UNKNOWN);
     }
