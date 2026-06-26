@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.casehub.eidos.api.AgentCapability;
+import io.casehub.eidos.api.AgentDescriptor;
 import io.casehub.eidos.api.AgentDisposition;
 import io.casehub.eidos.api.DispositionAxis;
 
@@ -53,5 +54,13 @@ public record AgentNodeSpec(
     @Override
     public String nodeType() {
         return "agent";
+    }
+
+    public AgentDescriptor toDescriptor(String tenancyId) {
+        return new AgentDescriptor(
+                agentId, name, version, provider, modelFamily, modelVersion,
+                weightsFingerprint, domainVocabulary, slotVocabulary,
+                dispositionVocabulary, axisVocabularies, slot, capabilities,
+                disposition, jurisdiction, dataHandlingPolicy, tenancyId, briefing);
     }
 }

@@ -4,7 +4,6 @@ import io.casehub.desiredstate.api.DeprovisionContext;
 import io.casehub.desiredstate.api.DeprovisionResult;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
-import io.casehub.eidos.api.AgentDescriptor;
 import io.casehub.eidos.api.AgentRegistry;
 import io.casehub.ops.api.deployment.AgentNodeSpec;
 import io.casehub.ops.deployment.DeploymentProviderConfigStore;
@@ -32,27 +31,7 @@ public class AgentProvisionHandler {
     }
 
     public ProvisionResult provision(AgentNodeSpec spec, ProvisionContext context) {
-        AgentDescriptor descriptor = new AgentDescriptor(
-                spec.agentId(),
-                spec.name(),
-                spec.version(),
-                spec.provider(),
-                spec.modelFamily(),
-                spec.modelVersion(),
-                spec.weightsFingerprint(),
-                spec.domainVocabulary(),
-                spec.slotVocabulary(),
-                spec.dispositionVocabulary(),
-                spec.axisVocabularies(),
-                spec.slot(),
-                spec.capabilities(),
-                spec.disposition(),
-                spec.jurisdiction(),
-                spec.dataHandlingPolicy(),
-                context.tenancyId(),
-                spec.briefing()
-        );
-        agentRegistry.register(descriptor);
+        agentRegistry.register(spec.toDescriptor(context.tenancyId()));
         providerConfigStore.store(spec.agentId(), spec.providerConfigs());
         return new ProvisionResult.Success();
     }
