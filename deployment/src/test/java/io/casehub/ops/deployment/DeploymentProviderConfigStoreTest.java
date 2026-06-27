@@ -51,6 +51,36 @@ class DeploymentProviderConfigStoreTest {
     }
 
     @Test
+    void agentIdsReturnsStoredKeys() {
+        store.store("agent-1", List.of(new ProviderConfig("docker", Map.of())));
+        store.store("agent-2", List.of(new ProviderConfig("k8s", Map.of())));
+
+        assertThat(store.agentIds()).containsExactlyInAnyOrder("agent-1", "agent-2");
+    }
+
+    @Test
+    void agentIdsEmptyWhenNoEntries() {
+        assertThat(store.agentIds()).isEmpty();
+    }
+
+    @Test
+    void agentIdsReflectsRemoval() {
+        store.store("agent-1", List.of(new ProviderConfig("docker", Map.of())));
+        store.store("agent-2", List.of(new ProviderConfig("k8s", Map.of())));
+        store.remove("agent-1");
+
+        assertThat(store.agentIds()).containsExactly("agent-2");
+    }
+
+    @Test
+    void agentIdsIsUnmodifiable() {
+        store.store("agent-1", List.of(new ProviderConfig("docker", Map.of())));
+
+        assertThatThrownBy(() -> store.agentIds().add("agent-2"))
+            .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
     void storedListIsImmutable() {
         String agentId = "agent-1";
         List<ProviderConfig> configs = List.of(
