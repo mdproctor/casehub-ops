@@ -506,7 +506,7 @@ Not closed here: TerraformBackend and AnsibleBackend are designed but not implem
 
 **Symptom:** `ResourceStatus.DEGRADED` maps to `NodeStatus.UNKNOWN`, causing the runtime to skip the node instead of treating it as drifted.
 **Cause:** The runtime's `NodeStatus` enum has no `DEGRADED` variant. DEGRADED → DRIFTED would be more correct (triggers re-provision), but UNKNOWN (skip/retry) is the safe default.
-**Fix:** Accept the lossy mapping for the PoC. If incorrect remediation occurs, propose `DEGRADED` and `IN_PROGRESS` to the desiredstate runtime.
+**Fix:** Accept the lossy mapping for the PoC. TransitionPlanner now treats DRIFTED as needing re-provision (casehub-desiredstate#38, resolved). If incorrect remediation occurs from the DEGRADED → UNKNOWN mapping specifically, propose `DEGRADED` and `IN_PROGRESS` to the desiredstate runtime.
 
 #### Architectural decisions
 
@@ -791,7 +791,6 @@ Sparse — most decisions are documented inline in the layer entries above. Cros
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| TransitionPlanner DRIFTED gap (casehub-desiredstate#38) | Drift detection works but re-provisioning never fires | One-line fix in TransitionPlanner — treat DRIFTED like ABSENT |
 | eidos API binary incompatibility | AgentCapability constructor changes break deployment module at runtime | Pin eidos version, test against latest in CI |
 | Single-domain constraint | Cannot compose infra + compliance on the same classpath | CDI qualifier-based dispatch if multi-domain needed |
 
@@ -803,7 +802,6 @@ Sparse — most decisions are documented inline in the layer entries above. Cros
 | Passive EventSource in all modules | All chapters | Active polling/subscription when ReconciliationLoop drives scheduling |
 | In-memory SpecHashStore | C2 deployment, C3 compliance | Persistent store if restart-resilient hash tracking needed |
 | Case type drift always PRESENT | C2 deployment | `CaseDefinitionRegistry.findByIdentity()` SPI change needed |
-| Worker import migration pending | #8 | Update imports when casehub-worker-api is published |
 
 ---
 
