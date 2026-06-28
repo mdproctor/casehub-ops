@@ -6,28 +6,32 @@ import io.casehub.ops.api.deployment.ChannelNodeSpec;
 import io.casehub.ops.api.deployment.NodeDriftChecker;
 import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.runtime.channel.Channel;
+import io.casehub.qhorus.runtime.channel.ChannelConnectorBinding;
+import io.casehub.qhorus.runtime.store.ChannelBindingStore;
+import io.casehub.qhorus.runtime.store.CrossTenantChannelStore;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
-/**
- * Checks drift for channel nodes by comparing mutable fields (allowedTypes, deniedTypes, rate limits).
- * Extracted from DeploymentActualStateAdapter.checkChannelStatus() and related helpers.
- */
 @ApplicationScoped
 public class ChannelDriftChecker implements NodeDriftChecker {
 
-    @FunctionalInterface
-    public interface ChannelLookup {
-        Optional<Channel> findByName(String name);
-    }
+    private static final Logger LOG = Logger.getLogger(ChannelDriftChecker.class);
 
-    private final ChannelLookup channelLookup;
+    private final CrossTenantChannelStore channelStore;
+    private final ChannelBindingStore bindingStore;
 
-    public ChannelDriftChecker(ChannelLookup channelLookup) {
-        this.channelLookup = channelLookup;
+    @Inject
+    public ChannelDriftChecker(CrossTenantChannelStore channelStore, ChannelBindingStore bindingStore) {
+        this.channelStore = channelStore;
+        this.bindingStore = bindingStore;
     }
 
     @Override
@@ -41,63 +45,144 @@ public class ChannelDriftChecker implements NodeDriftChecker {
             return NodeStatus.UNKNOWN;
         }
 
-        Optional<Channel> actual = channelLookup.findByName(channelSpec.name());
+        Optional<Channel> actual = channelStore.findByNameAndTenancy(channelSpec.name(), tenancyId);
         if (actual.isEmpty()) {
             return NodeStatus.ABSENT;
         }
 
-        return mutableFieldsMatch(channelSpec, actual.get()) ? NodeStatus.PRESENT : NodeStatus.DRIFTED;
+        boolean drifted = false;
+        Channel ch = actual.get();
+
+        // Channel field comparison
+        if (!fieldMatch("description", channelSpec.name(), channelSpec.description(), ch.description)) {
+            drifted = true;
+        }
+        if (!typesMatch("allowedTypes", channelSpec.name(), channelSpec.allowedTypes(), ch.allowedTypes)) {
+            drifted = true;
+        }
+        if (!typesMatch("deniedTypes", channelSpec.name(), channelSpec.deniedTypes(), ch.deniedTypes)) {
+            drifted = true;
+        }
+        if (!fieldMatch("rateLimitPerChannel", channelSpec.name(), channelSpec.rateLimitPerChannel(), ch.rateLimitPerChannel)) {
+            drifted = true;
+        }
+        if (!fieldMatch("rateLimitPerInstance", channelSpec.name(), channelSpec.rateLimitPerInstance(), ch.rateLimitPerInstance)) {
+            drifted = true;
+        }
+        if (!csvSetMatch("allowedWriters", channelSpec.name(), channelSpec.allowedWriters(), ch.allowedWriters)) {
+            drifted = true;
+        }
+        if (!csvSetMatch("adminInstances", channelSpec.name(), channelSpec.adminInstances(), ch.adminInstances)) {
+            drifted = true;
+        }
+        if (!csvSetMatch("barrierContributors", channelSpec.name(), channelSpec.barrierContributors(), ch.barrierContributors)) {
+            drifted = true;
+        }
+
+        // Binding comparison — always check, even if fields already drifted
+        if (!bindingMatch(channelSpec, ch.id)) {
+            drifted = true;
+        }
+
+        return drifted ? NodeStatus.DRIFTED : NodeStatus.PRESENT;
     }
 
-    private boolean mutableFieldsMatch(ChannelNodeSpec spec, Channel actual) {
-        // Compare mutable fields: allowedTypes, deniedTypes, rateLimitPerChannel, rateLimitPerInstance
-        if (!allowedTypesMatch(spec.allowedTypes(), actual.allowedTypes)) {
-            return false;
+    private boolean fieldMatch(String fieldName, String channelName, Object desired, Object actual) {
+        if (Objects.equals(desired, actual)) {
+            return true;
         }
-        if (!deniedTypesMatch(spec.deniedTypes(), actual.deniedTypes)) {
-            return false;
-        }
-        if (!Objects.equals(spec.rateLimitPerChannel(), actual.rateLimitPerChannel)) {
-            return false;
-        }
-        return Objects.equals(spec.rateLimitPerInstance(), actual.rateLimitPerInstance);
+        LOG.debugf("channel %s: %s drifted [%s → %s]", channelName, fieldName, desired, actual);
+        return false;
     }
 
-    private boolean allowedTypesMatch(Set<MessageType> desired, String actualCsv) {
-        // Both null means match (both open)
+    private boolean typesMatch(String fieldName, String channelName, Set<MessageType> desired, String actualCsv) {
         if (desired == null && actualCsv == null) {
             return true;
         }
-        // Empty set is treated as null (both open)
-        if ((desired == null || desired.isEmpty()) && actualCsv == null) {
-            return true;
-        }
-        if (desired == null && (actualCsv == null || actualCsv.isEmpty())) {
+        if ((desired == null || desired.isEmpty()) && (actualCsv == null || actualCsv.isEmpty())) {
             return true;
         }
         if (desired == null || actualCsv == null) {
+            LOG.debugf("channel %s: %s drifted [%s → %s]", channelName, fieldName, desired, actualCsv);
             return false;
         }
         Set<MessageType> actualSet = MessageType.parseTypes(actualCsv);
-        return desired.equals(actualSet);
+        if (desired.equals(actualSet)) {
+            return true;
+        }
+        LOG.debugf("channel %s: %s drifted [%s → %s]", channelName, fieldName, desired, actualSet);
+        return false;
     }
 
-    private boolean deniedTypesMatch(Set<MessageType> desired, String actualCsv) {
-        // Both null means match (no restrictions)
-        if (desired == null && actualCsv == null) {
+    private boolean csvSetMatch(String fieldName, String channelName, String desired, String actual) {
+        if (desired == null && actual == null) {
             return true;
         }
-        // Empty set is treated as null (no restrictions)
-        if ((desired == null || desired.isEmpty()) && actualCsv == null) {
+        if ((desired == null || desired.isBlank()) && (actual == null || actual.isBlank())) {
             return true;
         }
-        if (desired == null && (actualCsv == null || actualCsv.isEmpty())) {
-            return true;
-        }
-        if (desired == null || actualCsv == null) {
+        if (desired == null || actual == null) {
+            LOG.debugf("channel %s: %s drifted [%s → %s]", channelName, fieldName, desired, actual);
             return false;
         }
-        Set<MessageType> actualSet = MessageType.parseTypes(actualCsv);
-        return desired.equals(actualSet);
+        Set<String> desiredSet = parseCsvSet(desired);
+        Set<String> actualSet = parseCsvSet(actual);
+        if (desiredSet.equals(actualSet)) {
+            return true;
+        }
+        LOG.debugf("channel %s: %s drifted [%s → %s]", channelName, fieldName, desiredSet, actualSet);
+        return false;
+    }
+
+    private Set<String> parseCsvSet(String csv) {
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private boolean bindingMatch(ChannelNodeSpec spec, java.util.UUID channelId) {
+        boolean specHasBinding = spec.inboundConnectorId() != null
+                || spec.externalKey() != null
+                || spec.outboundConnectorId() != null
+                || spec.outboundDestination() != null;
+
+        Optional<ChannelConnectorBinding> actualBinding = bindingStore.findByChannelId(channelId);
+
+        if (!specHasBinding && actualBinding.isEmpty()) {
+            return true;
+        }
+        if (specHasBinding && actualBinding.isEmpty()) {
+            LOG.debugf("channel %s: binding expected but absent", spec.name());
+            return false;
+        }
+        if (!specHasBinding && actualBinding.isPresent()) {
+            LOG.debugf("channel %s: binding present but not in spec (reverse asymmetry)", spec.name());
+            return false;
+        }
+
+        ChannelConnectorBinding binding = actualBinding.get();
+        boolean match = true;
+        if (!Objects.equals(spec.inboundConnectorId(), binding.inboundConnectorId)) {
+            LOG.debugf("channel %s: binding.inboundConnectorId drifted [%s → %s]",
+                    spec.name(), spec.inboundConnectorId(), binding.inboundConnectorId);
+            match = false;
+        }
+        if (!Objects.equals(spec.externalKey(), binding.externalKey)) {
+            LOG.debugf("channel %s: binding.externalKey drifted [%s → %s]",
+                    spec.name(), spec.externalKey(), binding.externalKey);
+            match = false;
+        }
+        if (!Objects.equals(spec.outboundConnectorId(), binding.outboundConnectorId)) {
+            LOG.debugf("channel %s: binding.outboundConnectorId drifted [%s → %s]",
+                    spec.name(), spec.outboundConnectorId(), binding.outboundConnectorId);
+            match = false;
+        }
+        if (!Objects.equals(spec.outboundDestination(), binding.outboundDestination)) {
+            LOG.debugf("channel %s: binding.outboundDestination drifted [%s → %s]",
+                    spec.name(), spec.outboundDestination(), binding.outboundDestination);
+            match = false;
+        }
+        return match;
     }
 }

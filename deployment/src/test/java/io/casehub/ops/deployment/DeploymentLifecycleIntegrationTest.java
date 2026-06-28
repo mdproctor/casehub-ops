@@ -11,7 +11,10 @@ import io.casehub.platform.api.path.Path;
 import io.casehub.qhorus.api.channel.ChannelSemantic;
 import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.runtime.channel.Channel;
+import io.casehub.qhorus.runtime.channel.ChannelConnectorBinding;
 import io.casehub.qhorus.runtime.channel.ChannelCreateRequest;
+import io.casehub.qhorus.runtime.store.ChannelBindingStore;
+import io.casehub.qhorus.runtime.store.CrossTenantChannelStore;
 import io.smallrye.mutiny.helpers.test.AssertSubscriber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,8 @@ class DeploymentLifecycleIntegrationTest {
 
     private StubAgentRegistry agentRegistry;
     private StubChannelOperations channelOps;
+    private StubChannelStore channelStore;
+    private StubChannelBindingStore bindingStore;
     private StubEndpointRegistry endpointRegistry;
     private CaseTypeProvisionHandler caseTypeHandler;
     private DeploymentTrustRoutingPolicyProvider trustProvider;
@@ -44,7 +49,9 @@ class DeploymentLifecycleIntegrationTest {
     void setUp() {
         // Create stubs
         agentRegistry = new StubAgentRegistry();
-        channelOps = new StubChannelOperations();
+        channelStore = new StubChannelStore();
+        bindingStore = new StubChannelBindingStore();
+        channelOps = new StubChannelOperations(channelStore);
         endpointRegistry = new StubEndpointRegistry();
         providerConfigStore = new DeploymentProviderConfigStore();
         caseTypeHandler = new CaseTypeProvisionHandler();
@@ -55,7 +62,7 @@ class DeploymentLifecycleIntegrationTest {
 
         // Create drift checkers that use the stubs
         var agentChecker = new AgentDriftChecker(agentRegistry);
-        var channelChecker = new ChannelDriftChecker(channelOps::findByName);
+        var channelChecker = new ChannelDriftChecker(channelStore, bindingStore);
         var caseTypeChecker = new CaseTypeDriftChecker(caseTypeHandler);
         var trustChecker = new TrustPolicyDriftChecker(trustProvider);
         var endpointChecker = new EndpointDriftChecker(endpointRegistry);
@@ -283,6 +290,11 @@ class DeploymentLifecycleIntegrationTest {
 
     static class StubChannelOperations implements ChannelProvisionHandler.ChannelOperations {
         final Map<String, Channel> channels = new ConcurrentHashMap<>();
+        final StubChannelStore channelStore;
+
+        StubChannelOperations(StubChannelStore channelStore) {
+            this.channelStore = channelStore;
+        }
 
         @Override
         public Optional<Channel> findByName(String name) {
@@ -294,18 +306,26 @@ class DeploymentLifecycleIntegrationTest {
             Channel ch = new Channel();
             ch.id = UUID.randomUUID();
             ch.name = req.name();
+            ch.description = req.description();
             ch.semantic = req.semantic();
             ch.allowedTypes = req.allowedTypes() != null ? MessageType.serializeTypes(req.allowedTypes()) : null;
             ch.deniedTypes = req.deniedTypes() != null ? MessageType.serializeTypes(req.deniedTypes()) : null;
             ch.rateLimitPerChannel = req.rateLimitPerChannel();
             ch.rateLimitPerInstance = req.rateLimitPerInstance();
+            ch.allowedWriters = req.allowedWriters();
+            ch.adminInstances = req.adminInstances();
+            ch.barrierContributors = req.barrierContributors();
             channels.put(ch.name, ch);
+            // Also store in channelStore with tenancy — using TENANCY_ID constant
+            channelStore.put(ch, TENANCY_ID);
             return ch;
         }
 
         @Override
         public void delete(UUID channelId, boolean force) {
             channels.values().removeIf(ch -> ch.id.equals(channelId));
+            // Also remove from channelStore
+            channelStore.channels.entrySet().removeIf(e -> e.getValue().id.equals(channelId));
         }
 
         @Override
@@ -314,6 +334,7 @@ class DeploymentLifecycleIntegrationTest {
                 if (ch.id.equals(channelId)) {
                     ch.allowedTypes = allowed != null ? MessageType.serializeTypes(allowed) : null;
                     ch.deniedTypes = denied != null ? MessageType.serializeTypes(denied) : null;
+                    // Update is in-place, no need to update channelStore separately
                     return ch;
                 }
             }
@@ -326,6 +347,7 @@ class DeploymentLifecycleIntegrationTest {
                 if (ch.id.equals(channelId)) {
                     ch.rateLimitPerChannel = perChannel;
                     ch.rateLimitPerInstance = perInstance;
+                    // Update is in-place, no need to update channelStore separately
                     return ch;
                 }
             }
@@ -337,6 +359,7 @@ class DeploymentLifecycleIntegrationTest {
             for (Channel ch : channels.values()) {
                 if (ch.id.equals(channelId)) {
                     ch.allowedWriters = allowedWriters;
+                    // Update is in-place, no need to update channelStore separately
                     return ch;
                 }
             }
@@ -348,6 +371,7 @@ class DeploymentLifecycleIntegrationTest {
             for (Channel ch : channels.values()) {
                 if (ch.id.equals(channelId)) {
                     ch.adminInstances = adminInstances;
+                    // Update is in-place, no need to update channelStore separately
                     return ch;
                 }
             }
@@ -380,6 +404,64 @@ class DeploymentLifecycleIntegrationTest {
         @Override
         public void deregister(Path path, String tenancyId) {
             endpoints.remove(key(path, tenancyId));
+        }
+    }
+
+    static class StubChannelStore implements CrossTenantChannelStore {
+        final Map<String, Channel> channels = new ConcurrentHashMap<>();
+
+        private String key(String name, String tenancyId) {
+            return name + ":" + tenancyId;
+        }
+
+        @Override
+        public Optional<Channel> findByNameAndTenancy(String name, String tenancyId) {
+            return Optional.ofNullable(channels.get(key(name, tenancyId)));
+        }
+
+        @Override
+        public List<Channel> listAll() {
+            return new ArrayList<>(channels.values());
+        }
+
+        @Override
+        public Optional<Channel> findById(UUID id) {
+            return channels.values().stream()
+                    .filter(ch -> ch.id.equals(id))
+                    .findFirst();
+        }
+
+        void put(Channel channel, String tenancyId) {
+            channels.put(key(channel.name, tenancyId), channel);
+        }
+    }
+
+    static class StubChannelBindingStore implements ChannelBindingStore {
+        final Map<UUID, ChannelConnectorBinding> bindings = new ConcurrentHashMap<>();
+
+        @Override
+        public Optional<ChannelConnectorBinding> findByChannelId(UUID channelId) {
+            return Optional.ofNullable(bindings.get(channelId));
+        }
+
+        @Override
+        public Optional<ChannelConnectorBinding> findByKey(String inboundConnectorId, String externalKey) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void put(ChannelConnectorBinding binding) {
+            bindings.put(binding.channelId, binding);
+        }
+
+        @Override
+        public void delete(UUID channelId) {
+            bindings.remove(channelId);
+        }
+
+        @Override
+        public Map<UUID, ChannelConnectorBinding> findAll() {
+            return new HashMap<>(bindings);
         }
     }
 }
