@@ -1,0 +1,47 @@
+agents:
+  - spec:
+      agentId: triage-agent
+      name: Alert Triage
+      slot: worker
+  - spec:
+      agentId: risk-agent
+      name: Risk Monitor
+      slot: worker
+
+channels:
+  - spec:
+      name: trading/work
+      semantic: APPEND
+
+trust:
+  - spec:
+      capability: review
+      threshold: 0.7
+      minimumObservations: 5
+      borderlineMargin: 0.1
+      blendFactor: 0.5
+      bootstrapEscalationRequired: false
+
+adaptations:
+  - name: scale-risk-on-volatility
+    trigger:
+      situation: volatility-spike
+      minConfidence: 0.7
+      deactivateBelow: 0.5
+    actions:
+      - type: scale
+        target: risk-agent
+        min: 1
+        max: 5
+
+  - name: tighten-trust-on-anomaly
+    trigger:
+      situation: market-anomaly
+      minConfidence: 0.6
+    actions:
+      - type: update
+        target: review
+        nodeType: trust_policy
+        fields:
+          threshold: 0.9
+          bootstrapEscalationRequired: true
