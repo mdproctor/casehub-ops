@@ -54,14 +54,16 @@ public class DeploymentGoalLoader {
         var caseTypes = new ArrayList<GoalEntry<CaseTypeNodeSpec>>();
         var trust = new ArrayList<GoalEntry<TrustPolicyNodeSpec>>();
         var endpoints = new ArrayList<GoalEntry<EndpointNodeSpec>>();
+        var adaptations = new ArrayList<AdaptationRuleSpec>();
         for (var f : fragments) {
             agents.addAll(f.agents());
             channels.addAll(f.channels());
             caseTypes.addAll(f.caseTypes());
             trust.addAll(f.trust());
             endpoints.addAll(f.endpoints());
+            adaptations.addAll(f.adaptations());
         }
-        return new DeploymentGoals(agents, channels, caseTypes, trust, endpoints);
+        return new DeploymentGoals(agents, channels, caseTypes, trust, endpoints, adaptations);
     }
 
     private InputStream resolveStream(String path) {

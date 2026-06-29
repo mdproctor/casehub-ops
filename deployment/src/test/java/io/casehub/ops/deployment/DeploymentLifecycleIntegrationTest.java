@@ -114,7 +114,8 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(new GoalEntry<>(channelSpec, List.of())),
                 List.of(new GoalEntry<>(caseTypeSpec, List.of())),
                 List.of(new GoalEntry<>(trustSpec, List.of())),
-                List.of(new GoalEntry<>(endpointSpec, List.of())));
+                List.of(new GoalEntry<>(endpointSpec, List.of())),
+                List.of());
 
         // Compile
         var desired = compiler.compile(deploymentGoals, graphFactory);
@@ -172,6 +173,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of(),
                 List.of(),
+                List.of(),
                 List.of());
 
         var desired = compiler.compile(deploymentGoals, graphFactory);
@@ -185,6 +187,7 @@ class DeploymentLifecycleIntegrationTest {
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", null, List.of());
         var modifiedGoals = new DeploymentGoals(
                 List.of(new GoalEntry<>(modifiedSpec, List.of())),
+                List.of(),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -213,7 +216,8 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new GoalEntry<>(endpointSpec, List.of())));
+                List.of(new GoalEntry<>(endpointSpec, List.of())),
+                List.of());
 
         var desired = compiler.compile(deploymentGoals, graphFactory);
         var provisionContext = new ProvisionContext(TENANCY_ID, desired);
@@ -234,7 +238,8 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(new GoalEntry<>(modifiedSpec, List.of())));
+                List.of(new GoalEntry<>(modifiedSpec, List.of())),
+                List.of());
         var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
 
         // Read actual state — should detect drift

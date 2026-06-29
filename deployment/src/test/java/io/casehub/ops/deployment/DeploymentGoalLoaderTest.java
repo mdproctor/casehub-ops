@@ -53,10 +53,10 @@ class DeploymentGoalLoaderTest {
     void mergesConcatenatesLists() {
         var goals1 = new DeploymentGoals(
                 List.of(new GoalEntry<>(minimalAgent("a1"), List.of())),
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of());
         var goals2 = new DeploymentGoals(
                 List.of(new GoalEntry<>(minimalAgent("a2"), List.of())),
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of());
         var merged = loader.merge(goals1, goals2);
         assertThat(merged.agents()).hasSize(2);
     }
