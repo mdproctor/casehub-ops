@@ -29,7 +29,7 @@ public class DeploymentGoalCompiler implements GoalCompiler<DeploymentGoals> {
     }
 
     // No-arg constructor for tests that don't need definition resolution
-    DeploymentGoalCompiler() {
+    public DeploymentGoalCompiler() {
         this.definitionLoader = new DefinitionPayloadLoader();
     }
 
