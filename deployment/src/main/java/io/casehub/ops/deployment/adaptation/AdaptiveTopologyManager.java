@@ -115,7 +115,6 @@ public class AdaptiveTopologyManager {
         List<AdaptationRule> rules = AdaptationRule.fromSpecs(
             goals.adaptations(), compiler, mapper, graphFactory);
         var state = new TenantAdaptationState(goals, rules);
-        tenantStates.put(tenancyId, state);
 
         DesiredStateGraph adapted;
         synchronized (state) {
@@ -123,6 +122,7 @@ public class AdaptiveTopologyManager {
         }
         lastCompiledGraphs.put(tenancyId, adapted);
         reconciliationTarget.start(tenancyId, adapted);
+        tenantStates.put(tenancyId, state);
     }
 
     /**
@@ -257,7 +257,7 @@ public class AdaptiveTopologyManager {
      * interface (the runtime module is not a compile dependency of the deployment module).
      * In tests, a spy implementation records calls for verification.
      */
-    interface ReconciliationTarget {
+    public interface ReconciliationTarget {
         void start(String tenancyId, DesiredStateGraph desired);
         void updateDesired(String tenancyId, DesiredStateGraph newDesired);
         void requestReconciliation(String tenancyId);
