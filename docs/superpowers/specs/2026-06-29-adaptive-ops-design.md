@@ -310,9 +310,11 @@ public class AdaptiveTopologyManager {
         String tenancyId = event.tenancyId();
         TenantAdaptationState state = tenantStates.get(tenancyId);
         if (state == null) return;
-        DesiredStateGraph adapted = compileAdapted(tenancyId, state);
-        reconciliationLoop.updateDesired(tenancyId, adapted);
-        reconciliationLoop.requestReconciliation(tenancyId);
+        synchronized (state) {
+            DesiredStateGraph adapted = compileAdapted(tenancyId, state);
+            reconciliationLoop.updateDesired(tenancyId, adapted);
+            reconciliationLoop.requestReconciliation(tenancyId);
+        }
     }
 
     private DesiredStateGraph compileAdapted(String tenancyId,
@@ -441,7 +443,12 @@ public class AdaptiveTopologyManager {
 
 ### Thread Safety
 
-The outer `ConcurrentHashMap<String, TenantAdaptationState>` provides thread-safe tenant lookup. Each `TenantAdaptationState` uses plain `HashMap`s internally — this is safe because `compileAdapted()` for a given tenant is serialized through the reconciliation loop's debounce window. Concurrent situation events for the same tenant are coalesced by `requestReconciliation()`'s debounce, so the same tenant's state is never accessed concurrently.
+CDI `@ObservesAsync` provides no per-observer serialization — Quarkus dispatches async events on Vert.x worker pool threads. Two `SituationChangeEvent` events for the same tenant can execute concurrently, both calling `compileAdapted()` which mutates `TenantAdaptationState` (via `shouldActivate()` writes to `activePerRule`/`lastChangePerRule`, and `clearAbsentSituations()`). The `requestReconciliation()` debounce only coalesces `reconcile()` calls in `ReconciliationLoop` — it does not serialize `compileAdapted()`.
+
+Two levels of concurrency control:
+
+- **Cross-tenant:** `ConcurrentHashMap<String, TenantAdaptationState>` — thread-safe tenant lookup, no cross-tenant interference.
+- **Per-tenant:** `synchronized(state)` in `onSituationChange()` — serializes compilation and state mutation for a given tenant. The lock is on the per-tenant state object, so tenant A's compilation never blocks tenant B. The periodic situation re-poll (§Component 5) also synchronizes on the same state object.
 
 ### Runtime Changes Required
 
@@ -518,9 +525,17 @@ Applications can emit health events directly for faster self-healing:
 
 These use real node IDs with real statuses — semantically correct use of the event system. They trigger immediate reconciliation rather than waiting for the next periodic `ActualStateAdapter` check.
 
-### Periodic Re-Sync
+### Periodic Situation Re-Poll
 
-The existing 5-minute periodic re-sync continues to work. The `AdaptiveTopologyManager.onSituationChange()` is called on each situation event for immediate response. The periodic cycle serves as a safety net for missed events.
+The `ReconciliationLoop`'s existing 5-minute periodic re-sync is a safety net for **reconciliation** — detecting drift between desired and actual state. It is NOT a safety net for **adaptation** — it reconciles against whatever desired graph is in its `AtomicReference`, which may be stale if a `SituationChangeEvent` was lost.
+
+CDI async event delivery is best-effort. If an event is lost (queue overflow, observer exception, thread starvation), the adapted graph never updates. To guard against this, `AdaptiveTopologyManager` runs a periodic situation re-poll on the same interval as the reconciliation re-sync (default 5 minutes). For each tenant, it:
+
+1. Queries `situationSource.activeSituations(tenancyId)`
+2. Calls `compileAdapted()` (inside `synchronized(state)`)
+3. Compares the result to the current desired graph — if different, calls `updateDesired()` and `requestReconciliation()`
+
+This is the adaptation-layer equivalent of the reconciliation loop's periodic re-sync. Event-driven delivery provides low-latency response; periodic re-poll provides eventual consistency as a safety net.
 
 ---
 
