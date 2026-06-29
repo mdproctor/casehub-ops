@@ -72,6 +72,18 @@ class AdaptationRuleSpecTest {
     }
 
     @Test
+    void updateActionRejectsBlankNodeType() {
+        assertThrows(IllegalArgumentException.class, () ->
+            new AdaptationActionSpec.UpdateActionSpec("target", "", Map.of("key", "value")));
+    }
+
+    @Test
+    void updateActionAcceptsNullNodeType() {
+        var action = new AdaptationActionSpec.UpdateActionSpec("target", null, Map.of("key", "value"));
+        assertNull(action.nodeType());
+    }
+
+    @Test
     void addActionRejectsNullNodes() {
         assertThrows(NullPointerException.class, () ->
             new AdaptationActionSpec.AddActionSpec(null));

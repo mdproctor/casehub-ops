@@ -48,10 +48,13 @@ public sealed interface AdaptationActionSpec {
         public UpdateActionSpec {
             Objects.requireNonNull(target, "target");
             Objects.requireNonNull(fields, "fields");
+            if (nodeType != null && nodeType.isBlank()) {
+                throw new IllegalArgumentException("nodeType must not be blank");
+            }
+            fields = Map.copyOf(fields);
             if (fields.isEmpty()) {
                 throw new IllegalArgumentException("fields must not be empty");
             }
-            fields = Map.copyOf(fields);
         }
     }
 }
