@@ -708,7 +708,7 @@ What this layer adds:
 - **Capability normalization** — `CapabilityNormalizer` normalizes both desired and actual sides to a common representation (BigDecimal for numerics, String for enums, recursive Map normalization for Temperature). Ensures comparison works across YAML parsing types and IoT API types.
 - **Provider routing** — `IoTNodeProvisioner` resolves `DeviceProvider` by `providerId()` from the device registry, dispatches `DeviceCommand`s for each drifted capability.
 
-Not closed here: `IoTFaultPolicy` is no-op (needs operational feedback — #10). `requiresHuman=true` nodes are skipped by `SimpleTransitionExecutor` — WorkItem creation pending casehubio/casehub-desiredstate#43.
+Not closed here: `IoTFaultPolicy` is no-op (needs operational feedback — #10). `requiresHuman=true` nodes use `HumanNodeHandler` for WorkItem creation (casehubio/casehub-desiredstate#43 — shipped).
 
 #### Key files
 
