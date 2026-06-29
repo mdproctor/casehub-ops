@@ -114,7 +114,7 @@ adaptations:
 |---|---|---|
 | `scale` | Adjust instance count of a base node | Add/remove `DesiredNode` instances with derived IDs (`risk-agent~2`, `risk-agent~3`, ...) |
 | `add` | Insert new nodes (full spec inline) | `withNode()` for each declared node |
-| `update` | Modify fields of an existing node's spec | `withMutation(UpdateNode(...))` |
+| `update` | Modify fields of an existing node's spec | Jackson tree-merge → `withMutation(UpdateNode(...))` |
 
 ### Target Resolution
 
@@ -130,16 +130,33 @@ For `update` and `scale` actions, `target` matches against the `nodeId()` value 
 
 When `nodeType` is specified, matching is restricted to nodes of that type. If no match is found, the adaptation rule is skipped with a warning log.
 
+### Field Merge for Update Actions
+
+The `update` action specifies partial field overrides in the YAML `fields:` map. The graph API's `UpdateNode(NodeId, NodeSpec)` replaces the entire `NodeSpec`, so partial updates require constructing a complete new spec with overridden fields merged into the existing spec's values.
+
+All `DeploymentNodeSpec` types are immutable Java records with Jackson annotations (`@JsonIgnoreProperties(ignoreUnknown = true)`). The merge uses Jackson's tree model:
+
+```java
+ObjectNode base = mapper.valueToTree(existingSpec);
+ObjectNode overrides = mapper.valueToTree(fields);
+base.setAll(overrides);
+NodeSpec merged = mapper.treeToValue(base, existingSpec.getClass());
+```
+
+This is type-safe (Jackson validates the merged result against the record's canonical constructor), works for all `DeploymentNodeSpec` types without per-type builders, and handles nested fields (`qualityFloors` maps, `providerConfigs` lists). The `ObjectMapper` is the same YAML-configured instance used by `DeploymentGoalLoader`.
+
 ### Scale Instance Count
 
 For a scale action with range [min, max], active situation confidence C, and trigger minConfidence T:
 
 ```
-effective = (C - T) / (1.0 - T)
-instanceCount = min + (int)((max - min) * effective)
+effective = clamp((C - T) / (1.0 - T), 0.0, 1.0)
+instanceCount = clamp(min + (int)((max - min) * effective), min, max)
 ```
 
-This normalizes confidence against the activation threshold so the full [min, max] range maps to the useful confidence range [T, 1.0].
+This normalizes confidence against the activation threshold so the full [min, max] range maps to the useful confidence range [T, 1.0]. The double clamp ensures correctness in edge cases: `effective` is clamped to [0.0, 1.0] to handle hysteresis-band activation (confidence between `deactivateBelow` and `minConfidence` gives `effective < 0` without clamping), and `instanceCount` is clamped to [min, max] as a defensive bound.
+
+**Parse-time validation:** `minConfidence` must be strictly less than `1.0`. A value of `1.0` causes division by zero — this is a configuration error, not a runtime condition.
 
 Example with minConfidence=0.7, range [1, 5]:
 
@@ -149,7 +166,7 @@ Example with minConfidence=0.7, range [1, 5]:
 | 0.85 | 0.50 | 3 |
 | 1.00 | 1.00 | 5 (max) |
 
-The base node (e.g., `risk-agent`) is always present. Derived instances use the `~` separator: `risk-agent~2` through `risk-agent~N`, each with identical `AgentNodeSpec` fields except `agentId`.
+The base node (e.g., `risk-agent`) is always present. Derived instances use the `~` separator: `risk-agent~2` through `risk-agent~N`. Derived instances are constructed via `AgentNodeSpec.withAgentId(derivedId)` — a copy method that returns a new `AgentNodeSpec` with only the `agentId` changed, preserving all other fields without requiring the full 19-parameter constructor.
 
 ### Scale-Down Ordering
 
@@ -157,7 +174,12 @@ When instanceCount decreases, instances are removed highest-numbered first (LIFO
 
 ### NodeId Collision Validation
 
-Scale actions derive instance IDs using the pattern `{target}~{n}`. At YAML parse time, the parser validates that no base topology node has an ID matching `{target}~{n}` for any n in [2, max]. A collision is a configuration error — fail fast with a clear message.
+Scale actions derive instance IDs using the pattern `{target}~{n}`. At YAML parse time, the parser validates:
+
+1. The `target` node ID does not contain the `~` character. No existing `NodeSpec` type validates against `~` in its identifiers (`AgentNodeSpec` only checks non-null/non-blank, `NodeId` only checks non-null), so this validation is enforced at the adaptation rule layer where the separator is meaningful — not in the generic `NodeId` type.
+2. No base topology node has an ID matching `{target}~{n}` for any n in [2, max].
+
+Both are configuration errors — fail fast with a clear message.
 
 ### Hysteresis and Cooldown
 
@@ -196,9 +218,19 @@ public record ActiveSituation(
 - `evidence` — opaque map from Ganglion DetectionResult, forwarded for audit
 - `since` — when the situation was first detected
 
+### SituationChangeEvent
+
+CDI event fired by `SituationSource` implementations when situation state changes (activation, confidence update, or resolution):
+
+```java
+public record SituationChangeEvent(String tenancyId) {}
+```
+
+Defined in `casehub-desiredstate-api` alongside `SituationSource`. The `AdaptiveTopologyManager` observes this event via `@ObservesAsync` to trigger topology recompilation. The event carries only the tenant ID — the observer queries `SituationSource.activeSituations()` for current state rather than receiving a stale snapshot.
+
 ### Default Implementation
 
-`@DefaultBean` in the runtime returns `List.of()`. No active situations → no adaptations applied → system behaves exactly as today. Adaptive ops activates by dropping RAS + adapter on the classpath.
+`@DefaultBean` in the runtime returns `List.of()` and fires no events. No active situations → no adaptations applied → system behaves exactly as today. Adaptive ops activates by dropping RAS + adapter on the classpath.
 
 ### RAS Adapter
 
@@ -241,6 +273,19 @@ The `SituationSource` SPI defines what this spec *needs* from RAS. Issue ras#20 
 
 The `ReconciliationLoop` has no reference to any `GoalCompiler`. It receives a pre-compiled `DesiredStateGraph` via `start(tenancyId, graph)` and stores it in an `AtomicReference`. The only way to change the desired graph is externally via `updateDesired(tenancyId, newGraph)`. The `AdaptiveTopologyManager` sits between goal loading and the reconciliation loop, re-compiling and pushing graph updates when situations change.
 
+### Per-Tenant State
+
+`AdaptiveTopologyManager` is `@ApplicationScoped` — one instance shared across all tenants. All mutable state is stored per-tenant in a `TenantAdaptationState` object, keyed by `tenancyId` in a `ConcurrentHashMap`. This mirrors `ReconciliationLoop`'s own `ConcurrentHashMap<String, TenantLoop>` pattern.
+
+Each `TenantAdaptationState` holds:
+- The tenant's `DeploymentGoals` (base topology)
+- Parsed `List<AdaptationRule>` (from `goals.adaptations()`)
+- Hysteresis state: `activePerRule` and `lastChangePerRule`, keyed by rule name
+
+### Situation Change Delivery
+
+`AdaptiveTopologyManager` observes `SituationChangeEvent` CDI events fired by `SituationSource` implementations when situation state changes. This is the integration path from "RAS detects a volatility spike" to "topology recompiles."
+
 ```java
 @ApplicationScoped
 public class AdaptiveTopologyManager {
@@ -249,41 +294,46 @@ public class AdaptiveTopologyManager {
     @Inject DesiredStateGraphFactory graphFactory;
     @Inject SituationSource situationSource;
     @Inject ReconciliationLoop reconciliationLoop;
-    @Inject AdaptationRuleParser ruleParser;
 
-    private DeploymentGoals goals;
-    private List<AdaptationRule> rules;
-    private final Map<String, Instant> lastChangePerRule = new HashMap<>();
-    private final Map<String, Boolean> activePerRule = new HashMap<>();
+    private final ConcurrentHashMap<String, TenantAdaptationState> tenantStates =
+        new ConcurrentHashMap<>();
 
     public void initialize(String tenancyId, DeploymentGoals goals) {
-        this.goals = goals;
-        this.rules = ruleParser.rules();
-        DesiredStateGraph adapted = compileAdapted(tenancyId);
+        List<AdaptationRule> rules = AdaptationRule.fromSpecs(goals.adaptations());
+        var state = new TenantAdaptationState(goals, rules);
+        tenantStates.put(tenancyId, state);
+        DesiredStateGraph adapted = compileAdapted(tenancyId, state);
         reconciliationLoop.start(tenancyId, adapted);
     }
 
-    public void onSituationChange(String tenancyId) {
-        DesiredStateGraph adapted = compileAdapted(tenancyId);
+    public void onSituationChange(@ObservesAsync SituationChangeEvent event) {
+        String tenancyId = event.tenancyId();
+        TenantAdaptationState state = tenantStates.get(tenancyId);
+        if (state == null) return;
+        DesiredStateGraph adapted = compileAdapted(tenancyId, state);
         reconciliationLoop.updateDesired(tenancyId, adapted);
         reconciliationLoop.requestReconciliation(tenancyId);
     }
 
-    private DesiredStateGraph compileAdapted(String tenancyId) {
-        DesiredStateGraph base = compiler.compile(goals, graphFactory);
-        if (rules.isEmpty()) return base;
+    private DesiredStateGraph compileAdapted(String tenancyId,
+                                              TenantAdaptationState state) {
+        DesiredStateGraph base = compiler.compile(state.goals(), graphFactory);
+        if (state.rules().isEmpty()) return base;
 
         List<ActiveSituation> situations =
             situationSource.activeSituations(tenancyId);
-        if (situations.isEmpty()) return base;
+
+        Set<String> activeSituationIds = situations.stream()
+            .map(ActiveSituation::situationId)
+            .collect(Collectors.toSet());
 
         DesiredStateGraph adapted = base;
         Set<NodeId> modifiedNodes = new HashSet<>();
 
-        for (AdaptationRule rule : rules) {
+        for (AdaptationRule rule : state.rules()) {
             Optional<ActiveSituation> match = situations.stream()
                 .filter(s -> s.situationId().equals(rule.trigger().situation()))
-                .filter(s -> shouldActivate(rule, s))
+                .filter(s -> state.shouldActivate(rule, s))
                 .findFirst();
 
             if (match.isPresent()) {
@@ -299,42 +349,89 @@ public class AdaptiveTopologyManager {
                 modifiedNodes.addAll(targets);
             }
         }
+
+        // Clear activation state for rules whose trigger situation disappeared
+        state.clearAbsentSituations(activeSituationIds);
+
         return adapted;
     }
 
-    private boolean shouldActivate(AdaptationRule rule, ActiveSituation situation) {
-        boolean currentlyActive = activePerRule.getOrDefault(rule.name(), false);
+    private static class TenantAdaptationState {
+        private final DeploymentGoals goals;
+        private final List<AdaptationRule> rules;
+        private final Map<String, Instant> lastChangePerRule = new HashMap<>();
+        private final Map<String, Boolean> activePerRule = new HashMap<>();
 
-        // Hysteresis: use deactivateBelow threshold for already-active rules
-        double threshold = currentlyActive
-            ? rule.trigger().deactivateBelow()
-            : rule.trigger().minConfidence();
+        TenantAdaptationState(DeploymentGoals goals, List<AdaptationRule> rules) {
+            this.goals = goals;
+            this.rules = List.copyOf(rules);
+        }
 
-        boolean shouldBeActive = situation.confidence() >= threshold;
+        DeploymentGoals goals() { return goals; }
+        List<AdaptationRule> rules() { return rules; }
 
-        // Cooldown: enforce minimum time between state changes
-        if (shouldBeActive != currentlyActive && rule.trigger().cooldown() != null) {
-            Instant lastChange = lastChangePerRule.get(rule.name());
-            if (lastChange != null) {
-                Duration elapsed = Duration.between(lastChange, Instant.now());
-                if (elapsed.compareTo(rule.trigger().cooldown()) < 0) {
-                    return currentlyActive; // maintain current state during cooldown
+        boolean shouldActivate(AdaptationRule rule, ActiveSituation situation) {
+            boolean currentlyActive =
+                activePerRule.getOrDefault(rule.name(), false);
+
+            double threshold = currentlyActive
+                ? rule.trigger().deactivateBelow()
+                : rule.trigger().minConfidence();
+
+            boolean shouldBeActive = situation.confidence() >= threshold;
+
+            if (shouldBeActive != currentlyActive
+                    && rule.trigger().cooldown() != null) {
+                Instant lastChange = lastChangePerRule.get(rule.name());
+                if (lastChange != null) {
+                    Duration elapsed =
+                        Duration.between(lastChange, Instant.now());
+                    if (elapsed.compareTo(rule.trigger().cooldown()) < 0) {
+                        return currentlyActive;
+                    }
+                }
+            }
+
+            if (shouldBeActive != currentlyActive) {
+                lastChangePerRule.put(rule.name(), Instant.now());
+                activePerRule.put(rule.name(), shouldBeActive);
+            }
+            return shouldBeActive;
+        }
+
+        void clearAbsentSituations(Set<String> activeSituationIds) {
+            for (AdaptationRule rule : rules) {
+                String sit = rule.trigger().situation();
+                if (!activeSituationIds.contains(sit)) {
+                    Boolean wasActive = activePerRule.get(rule.name());
+                    if (wasActive != null && wasActive) {
+                        if (rule.trigger().cooldown() != null) {
+                            Instant lastChange =
+                                lastChangePerRule.get(rule.name());
+                            if (lastChange != null) {
+                                Duration elapsed = Duration.between(
+                                    lastChange, Instant.now());
+                                if (elapsed.compareTo(
+                                        rule.trigger().cooldown()) < 0) {
+                                    continue;
+                                }
+                            }
+                        }
+                        activePerRule.put(rule.name(), false);
+                        lastChangePerRule.put(rule.name(), Instant.now());
+                    }
                 }
             }
         }
-
-        // Track state transitions (both activation AND deactivation)
-        if (shouldBeActive != currentlyActive) {
-            lastChangePerRule.put(rule.name(), Instant.now());
-            activePerRule.put(rule.name(), shouldBeActive);
-        }
-        return shouldBeActive;
     }
 }
 ```
 
 ### Key Properties
 
+- **Per-tenant state.** All mutable state (goals, hysteresis tracking) is per-tenant in `TenantAdaptationState`, stored in a `ConcurrentHashMap`. No cross-tenant interference.
+- **CDI event-driven.** Observes `SituationChangeEvent` asynchronously — no polling, no manual wiring. `SituationSource` implementations fire the event when situation state changes.
+- **Situation disappearance handled.** After the rule loop, `clearAbsentSituations()` resets activation state for rules whose trigger situation is no longer active, respecting cooldown. A disappeared-then-reappeared situation must cross `minConfidence` again to reactivate.
 - **Domain-specific.** Knows about `DeploymentGoals` and `DeploymentGoalCompiler`. Other domains implement their own adaptation logic against the `SituationSource` SPI.
 - **Uses correct GoalCompiler signature.** Calls `compiler.compile(goals, graphFactory)` — the actual two-parameter `GoalCompiler<G>` SPI.
 - **No CDI ambiguity.** Injects `DeploymentGoalCompiler` (the concrete class), not `GoalCompiler<?>`. Single-domain-per-classpath constraint (ops ARC42STORIES §2) means no ambiguity.
@@ -342,11 +439,17 @@ public class AdaptiveTopologyManager {
 - **Re-compiles from base each time.** Never incrementally patches the adapted graph. Base → adaptations → result. This ensures consistency when situations appear/disappear.
 - **Rule actions use the existing immutable graph API.** `withNode()`, `withoutNode()`, `withMutation()` — no new graph operations needed.
 
+### Thread Safety
+
+The outer `ConcurrentHashMap<String, TenantAdaptationState>` provides thread-safe tenant lookup. Each `TenantAdaptationState` uses plain `HashMap`s internally — this is safe because `compileAdapted()` for a given tenant is serialized through the reconciliation loop's debounce window. Concurrent situation events for the same tenant are coalesced by `requestReconciliation()`'s debounce, so the same tenant's state is never accessed concurrently.
+
 ### Runtime Changes Required
 
-1. `AdaptationRuleParser` — new class in `casehub-ops-deployment`, reads the `adaptations:` YAML section, produces `List<AdaptationRule>`
-2. `AdaptationRule` — new type in `casehub-ops-api` with three action variants: `ScaleAction`, `AddAction`, `UpdateAction`
-3. `ReconciliationLoop.requestReconciliation(String tenancyId)` — new method in `casehub-desiredstate-runtime`, triggers a debounced reconciliation for a tenant without requiring a synthetic `StateEvent`
+1. `AdaptationRule` — new type in `io.casehub.ops.api.deployment` with three action variants: `ScaleAction`, `AddAction`, `UpdateAction`. Includes `fromSpecs()` factory method for parse-time validation.
+2. `SituationChangeEvent` — new CDI event type in `casehub-desiredstate-api`, fired by `SituationSource` implementations when situation state changes
+3. `ReconciliationLoop.requestReconciliation(String tenancyId)` — new method in `casehub-desiredstate-runtime`. Schedules a `reconcile()` call via a per-tenant `ScheduledFuture` with the debounce window as delay. Subsequent calls within the window cancel-and-reschedule, coalescing rapid situation changes. Cancellation on tenant loop stop. This is new infrastructure in `TenantLoop`, separate from the event-stream debounce pipeline.
+4. `DeploymentGoals.adaptations` — new field (`List<AdaptationRuleSpec>`) on the existing record. Jackson deserializes the `adaptations:` YAML section directly — no separate parser reads the YAML file. `@JsonIgnoreProperties(ignoreUnknown = true)` ensures backward compatibility for YAML without this section.
+5. `AgentNodeSpec.withAgentId(String)` — copy method returning a new `AgentNodeSpec` with only the `agentId` changed. Used by scale actions to construct derived instances (`risk-agent~2`, etc.) without calling the 19-parameter constructor at every call site.
 
 ---
 
@@ -402,7 +505,9 @@ When a RAS situation activates or resolves, the `AdaptiveTopologyManager`:
 2. Calls `reconciliationLoop.updateDesired(tenancyId, adaptedGraph)` to swap the desired graph
 3. Calls `reconciliationLoop.requestReconciliation(tenancyId)` to trigger immediate reconciliation
 
-The `requestReconciliation()` method triggers a debounced reconciliation cycle using the same debounce window as event-driven reconciliation. This avoids emitting synthetic `StateEvent`s with fake `NodeId`s that don't correspond to real graph nodes — `StateEvent` should only carry real node status changes.
+The `requestReconciliation()` method triggers a debounced reconciliation for the tenant. It does **not** reuse the event-stream's Mutiny debounce pipeline (which is specific to the `eventSource.stream()` subscription). Instead, it uses a separate per-tenant `ScheduledFuture` in `TenantLoop`: the first call schedules `reconcile()` after the debounce window; subsequent calls within the window cancel-and-reschedule, coalescing rapid situation changes into a single reconciliation cycle. The `ScheduledFuture` is cancelled when the tenant loop stops.
+
+This avoids emitting synthetic `StateEvent`s with fake `NodeId`s that don't correspond to real graph nodes — `StateEvent` should only carry real node status changes.
 
 ### External Health Checks
 
@@ -457,9 +562,9 @@ Quarkus app with casehub-ops-deployment + casehub-desiredstate + RAS adapter. JP
 
 | Repo | What's needed | Issue |
 |---|---|---|
-| casehub-desiredstate | `SituationSource` SPI + `ActiveSituation` record in API, `DefaultSituationSource` @DefaultBean in runtime, `requestReconciliation()` method on `ReconciliationLoop` | casehubio/casehub-desiredstate#49 |
+| casehub-desiredstate | `SituationSource` SPI + `ActiveSituation` record + `SituationChangeEvent` CDI event in API, `DefaultSituationSource` @DefaultBean in runtime, `requestReconciliation()` method on `ReconciliationLoop` (ScheduledFuture-based debounce in TenantLoop) | casehubio/casehub-desiredstate#49 |
 | casehub-ras | Long-lived situation lifecycle, `findAllActive()` query model, `RasSituationSource` adapter | casehubio/casehub-ras#20 |
-| casehub-ops | `AdaptiveTopologyManager`, `AdaptationRuleParser`, `AdaptationRule` types, deployment YAML `adaptations:` section, demo YAML for fsitrading and SOC | #25, #26 |
+| casehub-ops | `AdaptiveTopologyManager`, `AdaptationRule` types in `io.casehub.ops.api.deployment`, `DeploymentGoals.adaptations` field, `AgentNodeSpec.withAgentId()`, deployment YAML `adaptations:` section, demo YAML for fsitrading and SOC | #25, #26 |
 | casehub-fsitrading | Ganglion implementations for market situations, deployment YAML | casehubio/casehub-fsitrading#1 |
 | casehub-soc | Ganglion implementations for threat situations, deployment YAML | casehubio/casehub-soc#1 |
 
