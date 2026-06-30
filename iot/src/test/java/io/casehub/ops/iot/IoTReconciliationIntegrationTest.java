@@ -79,7 +79,9 @@ class IoTReconciliationIntegrationTest {
 
         var compiler = new IoTGoalCompiler();
         var adapter = new IoTActualStateAdapter(registry);
-        var provisioner = new IoTNodeProvisioner(registry, List.of(provider));
+        var approvalEvaluator = new IoTApprovalEvaluator();
+        var planStore = new io.casehub.ops.api.approval.InMemoryPlanStore();
+        var provisioner = new IoTNodeProvisioner(registry, List.of(provider), approvalEvaluator, planStore);
         var planner = new TransitionPlanner();
 
         var graph = compiler.compile(goals, FACTORY);

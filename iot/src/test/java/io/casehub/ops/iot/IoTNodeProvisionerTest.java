@@ -16,6 +16,7 @@ import io.casehub.iot.api.SwitchDevice;
 import io.casehub.iot.api.spi.DeviceProvider;
 import io.casehub.iot.api.spi.DeviceRegistry;
 import io.casehub.iot.api.ProviderStatus;
+import io.casehub.ops.api.approval.InMemoryPlanStore;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.PhysicalDeviceSpec;
 import io.smallrye.mutiny.Uni;
@@ -120,7 +121,9 @@ class IoTNodeProvisionerTest {
             .available(true).lastUpdated(NOW).tenancyId("t").providerId("unknown-provider")
             .on(false).build();
         var registry = singleDeviceRegistry(device);
-        var provisioner = new IoTNodeProvisioner(registry, List.of());
+        var approvalEvaluator = new IoTApprovalEvaluator();
+        var planStore = new InMemoryPlanStore();
+        var provisioner = new IoTNodeProvisioner(registry, List.of(), approvalEvaluator, planStore);
 
         var node = configNode("sw-1", DeviceClass.SWITCH, Map.of("isOn", true));
         var result = provisioner.provision(node, context());
@@ -162,7 +165,9 @@ class IoTNodeProvisionerTest {
             }
             public ProviderStatus status() { return ProviderStatus.CONNECTED; }
         };
-        return new IoTNodeProvisioner(registry, List.of(provider));
+        var approvalEvaluator = new IoTApprovalEvaluator();
+        var planStore = new InMemoryPlanStore();
+        return new IoTNodeProvisioner(registry, List.of(provider), approvalEvaluator, planStore);
     }
 
     private DeviceRegistry singleDeviceRegistry(DeviceEntity device) {

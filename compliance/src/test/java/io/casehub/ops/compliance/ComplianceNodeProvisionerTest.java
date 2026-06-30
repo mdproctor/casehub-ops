@@ -2,6 +2,7 @@ package io.casehub.ops.compliance;
 
 import io.casehub.desiredstate.api.*;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
+import io.casehub.ops.api.approval.InMemoryPlanStore;
 import io.casehub.ops.api.compliance.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,10 @@ class ComplianceNodeProvisionerTest {
                 ledgerRepo::findLatest);
         registry = new ComplianceFrameworkRegistry();
         specHashStore = new ComplianceSpecHashStore();
-        provisioner = new ComplianceNodeProvisioner(evidenceService, registry, specHashStore);
+        var approvalEvaluator = new ComplianceApprovalEvaluator();
+        var planStore = new InMemoryPlanStore();
+        provisioner = new ComplianceNodeProvisioner(evidenceService, registry, specHashStore,
+                approvalEvaluator, planStore);
         graphFactory = new DefaultDesiredStateGraphFactory();
     }
 
@@ -58,7 +62,10 @@ class ComplianceNodeProvisionerTest {
                 List.of(failCollector),
                 ledgerRepo::save,
                 ledgerRepo::findLatest);
-        provisioner = new ComplianceNodeProvisioner(evidenceService, registry, specHashStore);
+        var approvalEvaluator = new ComplianceApprovalEvaluator();
+        var planStore = new InMemoryPlanStore();
+        provisioner = new ComplianceNodeProvisioner(evidenceService, registry, specHashStore,
+                approvalEvaluator, planStore);
 
         var spec = new ComplianceControlSpec(
                 "enc", "ENCRYPTION_AT_REST", "Enc", "D", List.of(), 30, false, Map.of());

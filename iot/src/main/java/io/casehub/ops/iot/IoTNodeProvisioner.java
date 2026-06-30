@@ -6,10 +6,12 @@ import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.NodeProvisioner;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
+import io.casehub.desiredstate.api.StepAction;
 import io.casehub.iot.api.CommandResult;
 import io.casehub.iot.api.DeviceCommand;
 import io.casehub.iot.api.spi.DeviceProvider;
 import io.casehub.iot.api.spi.DeviceRegistry;
+import io.casehub.ops.api.approval.*;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.PhysicalDeviceSpec;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -29,23 +31,122 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     private final DeviceRegistry registry;
     private final Map<String, DeviceProvider> providers;
+    private final ApprovalEvaluator approvalEvaluator;
+    private final PlanStore planStore;
 
     @Inject
     public IoTNodeProvisioner(DeviceRegistry registry,
-                               @Any Instance<DeviceProvider> providerBeans) {
+                               @Any Instance<DeviceProvider> providerBeans,
+                               ApprovalEvaluator approvalEvaluator,
+                               PlanStore planStore) {
         this.registry = registry;
         this.providers = new HashMap<>();
         providerBeans.forEach(p -> providers.put(p.providerId(), p));
+        this.approvalEvaluator = approvalEvaluator;
+        this.planStore = planStore;
     }
 
-    IoTNodeProvisioner(DeviceRegistry registry, List<DeviceProvider> providerList) {
+    IoTNodeProvisioner(DeviceRegistry registry, List<DeviceProvider> providerList,
+                        ApprovalEvaluator approvalEvaluator, PlanStore planStore) {
         this.registry = registry;
         this.providers = new HashMap<>();
         providerList.forEach(p -> providers.put(p.providerId(), p));
+        this.approvalEvaluator = approvalEvaluator;
+        this.planStore = planStore;
     }
 
     @Override
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {
+        if (context.hasApproval()) {
+            return handleProvisionReEntry(node, context);
+        }
+
+        var decision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+        if (decision instanceof ApprovalDecision.RequiresApproval req) {
+            String ref = planStore.store(req.plan());
+            return new ProvisionResult.PendingApproval(node.id(), ref);
+        }
+
+        return doProvision(node, context);
+    }
+
+    @Override
+    public DeprovisionResult deprovision(DesiredNode node, DeprovisionContext context) {
+        if (context.hasApproval()) {
+            return handleDeprovisionReEntry(node, context);
+        }
+
+        var decision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+        if (decision instanceof ApprovalDecision.RequiresApproval req) {
+            String ref = planStore.store(req.plan());
+            return new DeprovisionResult.PendingApproval(node.id(), ref);
+        }
+
+        return doDeprovision(node, context);
+    }
+
+    private ProvisionResult handleProvisionReEntry(DesiredNode node, ProvisionContext context) {
+        var planOpt = planStore.retrieve(context.approval().planReference());
+        if (planOpt.isEmpty()) {
+            // Plan expired or was removed — re-evaluate without approval
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new ProvisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doProvision(node, context);
+        }
+
+        var plan = planOpt.get();
+        if (!plan.originalSpec().equals(node.spec())) {
+            // Spec changed since approval — remove stale plan, re-evaluate
+            planStore.remove(context.approval().planReference());
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new ProvisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doProvision(node, context);
+        }
+
+        // Plan valid — execute and clean up
+        ProvisionResult result = doProvision(node, context);
+        if (result instanceof ProvisionResult.Success) {
+            planStore.remove(context.approval().planReference());
+        }
+        return result;
+    }
+
+    private DeprovisionResult handleDeprovisionReEntry(DesiredNode node, DeprovisionContext context) {
+        var planOpt = planStore.retrieve(context.approval().planReference());
+        if (planOpt.isEmpty()) {
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new DeprovisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doDeprovision(node, context);
+        }
+
+        var plan = planOpt.get();
+        if (!plan.originalSpec().equals(node.spec())) {
+            planStore.remove(context.approval().planReference());
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new DeprovisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doDeprovision(node, context);
+        }
+
+        DeprovisionResult result = doDeprovision(node, context);
+        if (result instanceof DeprovisionResult.Success) {
+            planStore.remove(context.approval().planReference());
+        }
+        return result;
+    }
+
+    private ProvisionResult doProvision(DesiredNode node, ProvisionContext context) {
         return switch (node.spec()) {
             case PhysicalDeviceSpec s ->
                 new ProvisionResult.Failed("physical devices cannot be auto-provisioned");
@@ -54,8 +155,7 @@ public class IoTNodeProvisioner implements NodeProvisioner {
         };
     }
 
-    @Override
-    public DeprovisionResult deprovision(DesiredNode node, DeprovisionContext context) {
+    private DeprovisionResult doDeprovision(DesiredNode node, DeprovisionContext context) {
         return switch (node.spec()) {
             case PhysicalDeviceSpec s ->
                 new DeprovisionResult.Failed("physical devices cannot be auto-deprovisioned");
