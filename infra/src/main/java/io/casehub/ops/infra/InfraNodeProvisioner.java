@@ -8,23 +8,29 @@ import java.util.stream.Collectors;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 
 import io.casehub.desiredstate.api.DeprovisionContext;
 import io.casehub.desiredstate.api.DeprovisionResult;
 import io.casehub.desiredstate.api.DesiredNode;
+import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeProvisioner;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
+import io.casehub.desiredstate.api.StepAction;
+import io.casehub.ops.api.approval.ApprovalDecision;
+import io.casehub.ops.api.approval.ApprovalEvaluator;
 import io.casehub.ops.api.approval.ApprovalThresholds;
+import io.casehub.ops.api.approval.PlanStore;
 import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
 import io.casehub.ops.api.infra.context.ProvisionAction;
 import io.casehub.ops.api.infra.context.ProvisionPhase;
+import io.casehub.ops.api.infra.plan.ProvisionPlan;
 import io.casehub.ops.api.infra.spi.BackendDeprovisionResult;
 import io.casehub.ops.api.infra.spi.BackendProvisionResult;
 import io.casehub.ops.api.infra.spi.InfraBackend;
-import jakarta.inject.Inject;
 
 /**
  * Dispatches provisioning/deprovisioning to the correct {@link InfraBackend}
@@ -37,8 +43,10 @@ import jakarta.inject.Inject;
  * returns {@code Uni<T>}. This class bridges via {@code await().indefinitely()} — it must
  * be called from a worker thread, never from the Vert.x event loop.
  *
- * <p>TODO: plan/apply lifecycle — the runtime does not yet support PendingApproval callbacks,
- * so we always provision directly (APPLY phase).
+ * <p>Supports plan/apply lifecycle: first call evaluates approval via
+ * {@link ApprovalEvaluator}. If approval is required, returns {@code PendingApproval}.
+ * On re-entry with an approved plan, extracts the {@link ProvisionPlan} and passes it
+ * to the backend in APPLY phase.
  */
 @ApplicationScoped
 public class InfraNodeProvisioner implements NodeProvisioner {
@@ -47,17 +55,27 @@ public class InfraNodeProvisioner implements NodeProvisioner {
             new ApprovalThresholds(RiskClassification.LOW);
 
     private final Map<String, InfraBackend> backends;
+    private final ApprovalEvaluator approvalEvaluator;
+    private final PlanStore planStore;
 
     @Inject
-    public InfraNodeProvisioner(@Any Instance<InfraBackend> backends) {
+    public InfraNodeProvisioner(@Any Instance<InfraBackend> backends,
+                                ApprovalEvaluator approvalEvaluator,
+                                PlanStore planStore) {
         this.backends = backends.stream()
                 .collect(Collectors.toMap(InfraBackend::backendId, b -> b));
+        this.approvalEvaluator = approvalEvaluator;
+        this.planStore = planStore;
     }
 
-    /** Test constructor — accepts an explicit list of backends. */
-    InfraNodeProvisioner(List<InfraBackend> backends) {
+    /** Test constructor — accepts explicit backends, evaluator, and plan store. */
+    InfraNodeProvisioner(List<InfraBackend> backends,
+                         ApprovalEvaluator approvalEvaluator,
+                         PlanStore planStore) {
         this.backends = backends.stream()
                 .collect(Collectors.toMap(InfraBackend::backendId, b -> b));
+        this.approvalEvaluator = approvalEvaluator;
+        this.planStore = planStore;
     }
 
     @Override
@@ -71,18 +89,17 @@ public class InfraNodeProvisioner implements NodeProvisioner {
             return new ProvisionResult.Failed("No backend found for backendId: " + wrapper.backendId());
         }
 
-        var infraCtx = new InfraProvisionContext(
-                node.id(),
-                context.tenancyId(),
-                ProvisionPhase.APPLY,
-                ProvisionAction.PROVISION,
-                null,
-                DEFAULT_THRESHOLDS,
-                Instant.now());
+        if (context.hasApproval()) {
+            return handleProvisionReEntry(node, wrapper, backend, context);
+        }
 
-        BackendProvisionResult backendResult = backend.provision(wrapper.resourceSpec(), infraCtx)
-                .await().indefinitely();
-        return mapProvisionResult(backendResult);
+        var decision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+        if (decision instanceof ApprovalDecision.RequiresApproval req) {
+            String ref = planStore.store(req.plan());
+            return new ProvisionResult.PendingApproval(node.id(), ref);
+        }
+
+        return doProvision(node.id(), wrapper, backend, null, context.tenancyId());
     }
 
     @Override
@@ -96,12 +113,105 @@ public class InfraNodeProvisioner implements NodeProvisioner {
             return new DeprovisionResult.Failed("No backend found for backendId: " + wrapper.backendId());
         }
 
+        if (context.hasApproval()) {
+            return handleDeprovisionReEntry(node, wrapper, backend, context);
+        }
+
+        var decision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+        if (decision instanceof ApprovalDecision.RequiresApproval req) {
+            String ref = planStore.store(req.plan());
+            return new DeprovisionResult.PendingApproval(node.id(), ref);
+        }
+
+        return doDeprovision(node.id(), wrapper, backend, null, context.tenancyId());
+    }
+
+    private ProvisionResult handleProvisionReEntry(DesiredNode node, InfraDesiredNodeSpec wrapper,
+                                                    InfraBackend backend, ProvisionContext context) {
+        var planOpt = planStore.retrieve(context.approval().planReference());
+        if (planOpt.isEmpty()) {
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new ProvisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doProvision(node.id(), wrapper, backend, null, context.tenancyId());
+        }
+
+        var plan = planOpt.get();
+        if (!plan.originalSpec().equals(node.spec())) {
+            planStore.remove(context.approval().planReference());
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.PROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new ProvisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doProvision(node.id(), wrapper, backend, null, context.tenancyId());
+        }
+
+        ProvisionPlan infraPlan = plan.detail() instanceof ProvisionPlan p ? p : null;
+        ProvisionResult result = doProvision(node.id(), wrapper, backend, infraPlan, context.tenancyId());
+        if (result instanceof ProvisionResult.Success) {
+            planStore.remove(context.approval().planReference());
+        }
+        return result;
+    }
+
+    private DeprovisionResult handleDeprovisionReEntry(DesiredNode node, InfraDesiredNodeSpec wrapper,
+                                                        InfraBackend backend, DeprovisionContext context) {
+        var planOpt = planStore.retrieve(context.approval().planReference());
+        if (planOpt.isEmpty()) {
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new DeprovisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doDeprovision(node.id(), wrapper, backend, null, context.tenancyId());
+        }
+
+        var plan = planOpt.get();
+        if (!plan.originalSpec().equals(node.spec())) {
+            planStore.remove(context.approval().planReference());
+            var freshDecision = approvalEvaluator.evaluate(node, StepAction.DEPROVISION, context.tenancyId());
+            if (freshDecision instanceof ApprovalDecision.RequiresApproval req) {
+                String newRef = planStore.store(req.plan());
+                return new DeprovisionResult.PendingApproval(node.id(), newRef);
+            }
+            return doDeprovision(node.id(), wrapper, backend, null, context.tenancyId());
+        }
+
+        ProvisionPlan infraPlan = plan.detail() instanceof ProvisionPlan p ? p : null;
+        DeprovisionResult result = doDeprovision(node.id(), wrapper, backend, infraPlan, context.tenancyId());
+        if (result instanceof DeprovisionResult.Success) {
+            planStore.remove(context.approval().planReference());
+        }
+        return result;
+    }
+
+    private ProvisionResult doProvision(NodeId nodeId, InfraDesiredNodeSpec wrapper,
+                                         InfraBackend backend, ProvisionPlan approvedPlan,
+                                         String tenancyId) {
         var infraCtx = new InfraProvisionContext(
-                node.id(),
-                context.tenancyId(),
+                nodeId, tenancyId,
+                ProvisionPhase.APPLY,
+                ProvisionAction.PROVISION,
+                approvedPlan,
+                DEFAULT_THRESHOLDS,
+                Instant.now());
+
+        BackendProvisionResult backendResult = backend.provision(wrapper.resourceSpec(), infraCtx)
+                .await().indefinitely();
+        return mapProvisionResult(backendResult);
+    }
+
+    private DeprovisionResult doDeprovision(NodeId nodeId, InfraDesiredNodeSpec wrapper,
+                                             InfraBackend backend, ProvisionPlan approvedPlan,
+                                             String tenancyId) {
+        var infraCtx = new InfraProvisionContext(
+                nodeId, tenancyId,
                 ProvisionPhase.APPLY,
                 ProvisionAction.DEPROVISION,
-                null,
+                approvedPlan,
                 DEFAULT_THRESHOLDS,
                 Instant.now());
 
