@@ -239,12 +239,10 @@ class AgentProvisionHandlerTest {
 
         handler.provision(spec, new ProvisionContext("tenant-1", emptyGraph));
 
-        List<ProviderConfig> stored = providerConfigStore.forAgent("agent-1");
-        assertThat(stored).hasSize(2);
-        assertThat(stored).extracting(ProviderConfig::providerName)
-                .containsExactly("claudony", "openclaw");
-        assertThat(stored.get(0).config()).containsEntry("tools", "read,write");
-        assertThat(stored.get(1).config()).containsEntry("sessionKey", "reviewer");
+        Map<String, ProviderConfig> stored = providerConfigStore.forAgent("agent-1");
+        assertThat(stored).containsKey("claudony").containsKey("openclaw");
+        assertThat(stored.get("claudony").config()).containsEntry("tools", "read,write");
+        assertThat(stored.get("openclaw").config()).containsEntry("sessionKey", "reviewer");
     }
 
     @Test
@@ -279,7 +277,7 @@ class AgentProvisionHandlerTest {
 
         // Provision then deprovision
         handler.provision(spec, new ProvisionContext("tenant-1", emptyGraph));
-        assertThat(providerConfigStore.forAgent("agent-1")).hasSize(1);
+        assertThat(providerConfigStore.forAgent("agent-1")).containsKey("claudony");
 
         handler.deprovision(spec, new DeprovisionContext("tenant-1", emptyGraph));
 

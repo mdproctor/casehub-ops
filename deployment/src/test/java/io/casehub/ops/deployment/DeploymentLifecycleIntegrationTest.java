@@ -144,8 +144,8 @@ class DeploymentLifecycleIntegrationTest {
         }
 
         // Verify provider configs stored
-        assertThat(providerConfigStore.forAgent("agent-1")).hasSize(1);
-        var storedConfig = providerConfigStore.forAgent("agent-1").get(0);
+        assertThat(providerConfigStore.forAgent("agent-1")).containsKey("claudony");
+        var storedConfig = providerConfigStore.forAgent("agent-1").get("claudony");
         assertThat(storedConfig.providerName()).isEqualTo("claudony");
         assertThat(storedConfig.config().get("tools")).isEqualTo("read,write");
 

@@ -21,15 +21,15 @@ class DeploymentProviderConfigStoreTest {
 
     @Test
     void storeAndRetrieve() {
-        String agentId = "agent-1";
-        List<ProviderConfig> configs = List.of(
-            new ProviderConfig("docker", Map.of("host", "unix:///var/run/docker.sock")),
-            new ProviderConfig("k8s", Map.of("cluster", "prod"))
-        );
+        var docker = new ProviderConfig("docker", Map.of("host", "unix:///var/run/docker.sock"));
+        var k8s = new ProviderConfig("k8s", Map.of("cluster", "prod"));
 
-        store.store(agentId, configs);
+        store.store("agent-1", List.of(docker, k8s));
 
-        assertThat(store.forAgent(agentId)).isEqualTo(configs);
+        Map<String, ProviderConfig> result = store.forAgent("agent-1");
+        assertThat(result).containsEntry("docker", docker);
+        assertThat(result).containsEntry("k8s", k8s);
+        assertThat(result).hasSize(2);
     }
 
     @Test
@@ -39,15 +39,25 @@ class DeploymentProviderConfigStoreTest {
 
     @Test
     void removeClears() {
-        String agentId = "agent-1";
-        List<ProviderConfig> configs = List.of(
+        store.store("agent-1", List.of(
             new ProviderConfig("docker", Map.of("host", "unix:///var/run/docker.sock"))
-        );
+        ));
 
-        store.store(agentId, configs);
-        store.remove(agentId);
+        store.remove("agent-1");
 
-        assertThat(store.forAgent(agentId)).isEmpty();
+        assertThat(store.forAgent("agent-1")).isEmpty();
+    }
+
+    @Test
+    void duplicateProviderNameLastWriteWins() {
+        var first = new ProviderConfig("claudony", Map.of("tools", "read"));
+        var second = new ProviderConfig("claudony", Map.of("tools", "read,write"));
+
+        store.store("agent-1", List.of(first, second));
+
+        Map<String, ProviderConfig> result = store.forAgent("agent-1");
+        assertThat(result).hasSize(1);
+        assertThat(result.get("claudony").config()).containsEntry("tools", "read,write");
     }
 
     @Test
@@ -81,16 +91,14 @@ class DeploymentProviderConfigStoreTest {
     }
 
     @Test
-    void storedListIsImmutable() {
-        String agentId = "agent-1";
-        List<ProviderConfig> configs = List.of(
+    void storedMapIsUnmodifiable() {
+        store.store("agent-1", List.of(
             new ProviderConfig("docker", Map.of("host", "unix:///var/run/docker.sock"))
-        );
+        ));
 
-        store.store(agentId, configs);
-        List<ProviderConfig> retrieved = store.forAgent(agentId);
+        Map<String, ProviderConfig> retrieved = store.forAgent("agent-1");
 
-        assertThatThrownBy(() -> retrieved.add(new ProviderConfig("k8s", Map.of())))
+        assertThatThrownBy(() -> retrieved.put("k8s", new ProviderConfig("k8s", Map.of())))
             .isInstanceOf(UnsupportedOperationException.class);
     }
 }
