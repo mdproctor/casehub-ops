@@ -1,7 +1,7 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.ActiveSituation;
+import io.casehub.ras.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;

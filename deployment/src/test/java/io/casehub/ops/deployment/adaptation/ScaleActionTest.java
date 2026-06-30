@@ -1,6 +1,6 @@
 package io.casehub.ops.deployment.adaptation;
 
-import io.casehub.desiredstate.api.ActiveSituation;
+import io.casehub.ras.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
@@ -29,7 +29,7 @@ class ScaleActionTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 0.7, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 0.7, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -44,7 +44,7 @@ class ScaleActionTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -67,7 +67,7 @@ class ScaleActionTest {
         var graph = factory.of(List.of(baseNode), List.of());
         // effective = (0.85 - 0.7) / (1.0 - 0.7) = 0.15 / 0.3 = 0.5
         // instances = 1 + (int)((5 - 1) * 0.5) = 1 + 2 = 3
-        var situation = new ActiveSituation("high-load", 0.85, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 0.85, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -86,7 +86,7 @@ class ScaleActionTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -111,7 +111,7 @@ class ScaleActionTest {
         var graph = factory.of(List.of(baseNode), List.of());
 
         // Scale up to 5
-        var situationMax = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situationMax = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
         var graphScaledUp = action.apply(graph, situationMax, 0.7);
         assertThat(graphScaledUp.nodes()).hasSize(5);
 
@@ -121,7 +121,7 @@ class ScaleActionTest {
         // Actually let's use 0.775 to get 2 instances
         // effective = (0.775 - 0.7) / 0.3 = 0.25
         // instances = 1 + (int)(4 * 0.25) = 1 + 1 = 2
-        var situationDown = new ActiveSituation("high-load", 0.775, Map.of(), Instant.now());
+        var situationDown = new ActiveSituation("high-load", "_singleton", "test", 0.775, Map.of(), Instant.now(), Instant.now(), 0);
         var graphScaledDown = action.apply(graphScaledUp, situationDown, 0.7);
 
         assertThat(graphScaledDown.nodes()).hasSize(2);
@@ -143,7 +143,7 @@ class ScaleActionTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -171,7 +171,7 @@ class ScaleActionTest {
             false
         );
         var graph = factory.of(List.of(trustNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 
@@ -186,7 +186,7 @@ class ScaleActionTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = action.apply(graph, situation, 0.7);
 

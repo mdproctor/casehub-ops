@@ -1,12 +1,12 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
-import io.casehub.desiredstate.api.SituationChangeEvent;
-import io.casehub.desiredstate.api.SituationSource;
+import io.casehub.ras.api.ActiveSituation;
+import io.casehub.ras.api.SituationChangeEvent;
+import io.casehub.ras.api.SituationSource;
 import io.casehub.ops.api.deployment.DeploymentGoals;
 import io.casehub.ops.deployment.DeploymentGoalCompiler;
 import jakarta.annotation.PreDestroy;
@@ -190,7 +190,8 @@ public class AdaptiveTopologyManager {
             return base;
         }
 
-        List<ActiveSituation> situations = situationSource.activeSituations(tenancyId);
+        List<ActiveSituation> situations = situationSource.activeSituations(tenancyId)
+            .await().indefinitely();
 
         Set<String> activeSituationIds = situations.stream()
             .map(ActiveSituation::situationId)

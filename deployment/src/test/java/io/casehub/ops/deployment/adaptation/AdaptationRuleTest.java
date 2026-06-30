@@ -1,7 +1,7 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.ActiveSituation;
+import io.casehub.ras.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
@@ -62,7 +62,7 @@ class AdaptationRuleTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("high-load", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = rule.apply(graph, situation);
 
@@ -99,7 +99,7 @@ class AdaptationRuleTest {
             false
         );
         var graph = factory.of(List.of(node), List.of());
-        var situation = new ActiveSituation("policy-change", 0.9, Map.of(), Instant.now());
+        var situation = new ActiveSituation("policy-change", "_singleton", "test", 0.9, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = rule.apply(graph, situation);
 
@@ -132,7 +132,7 @@ class AdaptationRuleTest {
 
         var baseNode = createAgentNode("risk-agent");
         var graph = factory.of(List.of(baseNode), List.of());
-        var situation = new ActiveSituation("expand-capacity", 0.85, Map.of(), Instant.now());
+        var situation = new ActiveSituation("expand-capacity", "_singleton", "test", 0.85, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = rule.apply(graph, situation);
 
@@ -204,7 +204,7 @@ class AdaptationRuleTest {
             false
         );
         var graph = factory.of(List.of(baseNode, policyNode), List.of());
-        var situation = new ActiveSituation("combined", 1.0, Map.of(), Instant.now());
+        var situation = new ActiveSituation("combined", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
 
         var result = rule.apply(graph, situation);
 
