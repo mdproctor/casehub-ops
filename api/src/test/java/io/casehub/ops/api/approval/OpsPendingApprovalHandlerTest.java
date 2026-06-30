@@ -129,6 +129,22 @@ class OpsPendingApprovalHandlerTest {
         assertThat(result).isFalse();
     }
 
+    @Test
+    void rejectReturnsFalseWhenAlreadyRejected() {
+        handler.recordPending(testNode(), StepAction.PROVISION, TENANT, "plan-ref-1");
+        handler.reject(NODE_1, StepAction.PROVISION, TENANT, "too risky");
+        boolean result = handler.reject(NODE_1, StepAction.PROVISION, TENANT, "another reason");
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void approveReturnsFalseWhenRejected() {
+        handler.recordPending(testNode(), StepAction.PROVISION, TENANT, "plan-ref-1");
+        handler.reject(NODE_1, StepAction.PROVISION, TENANT, "too risky");
+        boolean result = handler.approve(NODE_1, StepAction.PROVISION, TENANT, "admin");
+        assertThat(result).isFalse();
+    }
+
     // --- recordPending supersedes stale entry ---
 
     @Test

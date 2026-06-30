@@ -55,23 +55,29 @@ public class OpsPendingApprovalHandler implements PendingApprovalHandler {
 
     public boolean approve(NodeId nodeId, StepAction action, String tenancyId, String approvedBy) {
         String k = key(nodeId, action, tenancyId);
-        var entry = entries.get(k);
-        if (entry == null || entry.status != Status.PENDING) {
-            return false;
-        }
-        var approval = new PlanApproval(entry.planReference, approvedBy, Instant.now());
-        entries.put(k, new PendingEntry(entry.planReference, Status.APPROVED, approval, null));
-        return true;
+        boolean[] transitioned = {false};
+        entries.compute(k, (key, entry) -> {
+            if (entry == null || entry.status != Status.PENDING) {
+                return entry;
+            }
+            transitioned[0] = true;
+            return new PendingEntry(entry.planReference, Status.APPROVED,
+                    new PlanApproval(entry.planReference, approvedBy, Instant.now()), null);
+        });
+        return transitioned[0];
     }
 
     public boolean reject(NodeId nodeId, StepAction action, String tenancyId, String reason) {
         String k = key(nodeId, action, tenancyId);
-        var entry = entries.get(k);
-        if (entry == null || entry.status != Status.PENDING) {
-            return false;
-        }
-        entries.put(k, new PendingEntry(entry.planReference, Status.REJECTED, null, reason));
-        return true;
+        boolean[] transitioned = {false};
+        entries.compute(k, (key, entry) -> {
+            if (entry == null || entry.status != Status.PENDING) {
+                return entry;
+            }
+            transitioned[0] = true;
+            return new PendingEntry(entry.planReference, Status.REJECTED, null, reason);
+        });
+        return transitioned[0];
     }
 
     private String key(NodeId nodeId, StepAction action, String tenancyId) {
