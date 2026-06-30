@@ -23,8 +23,8 @@ import io.casehub.ops.api.infra.K8sNamespaceSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
 import io.casehub.ops.api.infra.context.ProvisionAction;
 import io.casehub.ops.api.infra.context.ProvisionPhase;
-import io.casehub.ops.api.infra.context.RiskClassification;
-import io.casehub.ops.api.infra.context.RiskThresholds;
+import io.casehub.ops.api.approval.ApprovalThresholds;
+import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.goal.ImportDeclaration;
 import io.casehub.ops.api.infra.goal.InfraGoals;
 import io.casehub.ops.api.infra.goal.ResourceDeclaration;
@@ -289,7 +289,7 @@ class InfraBackendContractTest {
 
         var context = new InfraProvisionContext(
                 TEST_NODE_ID, "tenant-1", ProvisionPhase.APPLY, ProvisionAction.PROVISION,
-                plan, new RiskThresholds(RiskClassification.MEDIUM, false), NOW);
+                plan, new ApprovalThresholds(RiskClassification.MEDIUM), NOW);
 
         assertThat(context.phase()).isEqualTo(ProvisionPhase.APPLY);
         assertThat(context.approvedPlan()).isNotNull();
@@ -298,7 +298,7 @@ class InfraBackendContractTest {
 
     @Test
     void infraProvisionContext_requiresNonNullFields() {
-        var thresholds = new RiskThresholds(RiskClassification.LOW, false);
+        var thresholds = new ApprovalThresholds(RiskClassification.LOW);
 
         assertThatNullPointerException()
                 .isThrownBy(() -> new InfraProvisionContext(null, "t", ProvisionPhase.PLAN,
@@ -532,7 +532,7 @@ class InfraBackendContractTest {
     private InfraProvisionContext planContext() {
         return new InfraProvisionContext(
                 TEST_NODE_ID, "tenant-1", ProvisionPhase.PLAN, ProvisionAction.PROVISION,
-                null, new RiskThresholds(RiskClassification.LOW, false), NOW);
+                null, new ApprovalThresholds(RiskClassification.LOW), NOW);
     }
 
     private String describeProvisionResult(BackendProvisionResult result) {

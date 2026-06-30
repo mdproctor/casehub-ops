@@ -15,12 +15,12 @@ import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.NodeProvisioner;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
+import io.casehub.ops.api.approval.ApprovalThresholds;
+import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
 import io.casehub.ops.api.infra.context.ProvisionAction;
 import io.casehub.ops.api.infra.context.ProvisionPhase;
-import io.casehub.ops.api.infra.context.RiskClassification;
-import io.casehub.ops.api.infra.context.RiskThresholds;
 import io.casehub.ops.api.infra.spi.BackendDeprovisionResult;
 import io.casehub.ops.api.infra.spi.BackendProvisionResult;
 import io.casehub.ops.api.infra.spi.InfraBackend;
@@ -43,8 +43,8 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class InfraNodeProvisioner implements NodeProvisioner {
 
-    private static final RiskThresholds DEFAULT_THRESHOLDS =
-            new RiskThresholds(RiskClassification.LOW, false);
+    private static final ApprovalThresholds DEFAULT_THRESHOLDS =
+            new ApprovalThresholds(RiskClassification.LOW);
 
     private final Map<String, InfraBackend> backends;
 

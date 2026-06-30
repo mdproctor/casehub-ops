@@ -8,12 +8,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import io.casehub.desiredstate.api.NodeId;
+import io.casehub.ops.api.approval.ApprovalThresholds;
+import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.K8sNamespaceSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
 import io.casehub.ops.api.infra.context.ProvisionAction;
 import io.casehub.ops.api.infra.context.ProvisionPhase;
-import io.casehub.ops.api.infra.context.RiskClassification;
-import io.casehub.ops.api.infra.context.RiskThresholds;
 import io.casehub.ops.api.infra.spi.BackendDeprovisionResult;
 import io.casehub.ops.api.infra.spi.BackendProvisionResult;
 import io.casehub.ops.api.infra.spi.ResourceProvisioner;
@@ -23,7 +23,7 @@ import io.casehub.ops.api.infra.types.Labels;
 class StandaloneBackendTest {
 
     private static final NodeId NODE_1 = NodeId.of("node-1");
-    private static final RiskThresholds THRESHOLDS = new RiskThresholds(RiskClassification.LOW, false);
+    private static final ApprovalThresholds THRESHOLDS = new ApprovalThresholds(RiskClassification.LOW);
 
     private InfraProvisionContext provisionContext(NodeId nodeId) {
         return new InfraProvisionContext(
