@@ -76,7 +76,9 @@ class DeploymentLifecycleIntegrationTest {
                 caseTypeHandler,
                 new TrustPolicyProvisionHandler(trustProvider),
                 new EndpointProvisionHandler(endpointRegistry),
-                specHashStore);
+                specHashStore,
+                (node, action, tenancyId) -> new io.casehub.ops.api.approval.ApprovalDecision.AutoApproved(),
+                new io.casehub.ops.api.approval.InMemoryPlanStore());
         adapter = new DeploymentActualStateAdapter(
                 List.of(agentChecker, channelChecker, caseTypeChecker, trustChecker, endpointChecker),
                 specHashStore);
