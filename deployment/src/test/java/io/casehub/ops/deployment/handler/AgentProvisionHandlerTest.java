@@ -43,10 +43,10 @@ class AgentProvisionHandlerTest {
     @Test
     void provisionRegistersAgentDescriptor() {
         AgentCapability analyzeCapability = new AgentCapability(
-                "analyze", 0.9, 500L, "low", List.of("text"), List.of("analysis"), List.of(), Map.of(), null
+                "analyze", null, 0.9, 500L, "low", List.of("text"), List.of("analysis"), List.of(), Map.of(), null
         );
         AgentCapability classifyCapability = new AgentCapability(
-                "classify", 0.85, 300L, "low", List.of("text"), List.of("category"), List.of(), Map.of(), null
+                "classify", null, 0.85, 300L, "low", List.of("text"), List.of("category"), List.of(), Map.of(), null
         );
         AgentDisposition disposition = AgentDisposition.builder()
                 .socialOrient("collaborative")
@@ -108,10 +108,10 @@ class AgentProvisionHandlerTest {
     @Test
     void provisionIsIdempotent_upsertReplacesDescriptor() {
         AgentCapability cap1 = new AgentCapability(
-                "cap-1", null, null, null, List.of(), List.of(), List.of(), Map.of(), null
+                "cap-1", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null
         );
         AgentCapability cap2 = new AgentCapability(
-                "cap-2", null, null, null, List.of(), List.of(), List.of(), Map.of(), null
+                "cap-2", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null
         );
         AgentDisposition disp1 = AgentDisposition.builder().delegation(false).build();
         AgentDisposition disp2 = AgentDisposition.builder().delegation(true).build();
@@ -175,7 +175,7 @@ class AgentProvisionHandlerTest {
     @Test
     void deprovisionReturnsSuccess() {
         AgentCapability cap = new AgentCapability(
-                "cap", null, null, null, List.of(), List.of(), List.of(), Map.of(), null
+                "cap", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null
         );
         AgentDisposition disp = AgentDisposition.builder().delegation(false).build();
 
@@ -209,7 +209,7 @@ class AgentProvisionHandlerTest {
     @Test
     void provisionStoresProviderConfigs() {
         AgentCapability cap = new AgentCapability(
-                "cap", null, null, null, List.of(), List.of(), List.of(), Map.of(), null
+                "cap", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null
         );
         AgentDisposition disp = AgentDisposition.builder().delegation(false).build();
 
@@ -248,7 +248,7 @@ class AgentProvisionHandlerTest {
     @Test
     void deprovisionRemovesProviderConfigs() {
         AgentCapability cap = new AgentCapability(
-                "cap", null, null, null, List.of(), List.of(), List.of(), Map.of(), null
+                "cap", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null
         );
         AgentDisposition disp = AgentDisposition.builder().delegation(false).build();
 

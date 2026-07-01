@@ -3,6 +3,7 @@ package io.casehub.ops.deployment;
 import io.casehub.desiredstate.api.*;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.eidos.api.*;
+import io.casehub.ops.api.approval.*;
 import io.casehub.ops.api.deployment.*;
 import io.casehub.ops.deployment.handler.*;
 import io.casehub.platform.api.endpoints.*;
@@ -14,6 +15,7 @@ import io.casehub.qhorus.runtime.channel.ChannelCreateRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,6 +30,7 @@ class DeploymentNodeProvisionerTest {
     private StubEndpointRegistry endpointRegistry;
     private SpecHashStore specHashStore;
     private DesiredStateGraph emptyGraph;
+    private InMemoryPlanStore planStore;
 
     @BeforeEach
     void setUp() {
@@ -35,6 +38,7 @@ class DeploymentNodeProvisionerTest {
         channelOps = new StubChannelOperations();
         endpointRegistry = new StubEndpointRegistry();
         specHashStore = new SpecHashStore();
+        planStore = new InMemoryPlanStore();
         var providerConfigStore = new DeploymentProviderConfigStore();
         var caseTypeHandler = new CaseTypeProvisionHandler();
         var trustProvider = new DeploymentTrustRoutingPolicyProvider();
@@ -48,12 +52,14 @@ class DeploymentNodeProvisionerTest {
                 caseTypeHandler,
                 trustHandler,
                 new EndpointProvisionHandler(endpointRegistry),
-                specHashStore);
+                specHashStore,
+                new DeploymentApprovalEvaluator(),
+                planStore);
     }
 
     @Test
     void dispatchesAgentToHandler() {
-        var cap = new AgentCapability("cap-a", null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var disp = AgentDisposition.builder().delegation(false).build();
         var spec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy", null, List.of());
@@ -120,6 +126,111 @@ class DeploymentNodeProvisionerTest {
         provisioner.provision(node, new ProvisionContext("tenant-1", emptyGraph));
         // Unknown spec causes Failed — should not record hash
         assertThat(specHashStore.hasDrifted(NodeId.of("ns1"), unknownSpec)).isTrue();
+    }
+
+    // --- Approval flow tests ---
+
+    @Test
+    void highRiskNodeReturnsPendingApproval() {
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+        var context = new ProvisionContext("tenant-1", emptyGraph);
+
+        var result = provisioner.provision(node, context);
+
+        assertThat(result).isInstanceOf(ProvisionResult.PendingApproval.class);
+        var pending = (ProvisionResult.PendingApproval) result;
+        assertThat(pending.nodeId()).isEqualTo(NodeId.of("tp-1"));
+        assertThat(pending.planReference()).isNotNull();
+        // Plan should be stored
+        assertThat(planStore.retrieve(pending.planReference())).isPresent();
+    }
+
+    @Test
+    void lowRiskNodeProvisionsDirect() {
+        var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
+                null, null, null, null, null, null, null, null, null, null, null);
+        var node = new DesiredNode(NodeId.of("ch-1"), NodeType.of("channel"), spec, false);
+        var context = new ProvisionContext("tenant-1", emptyGraph);
+
+        var result = provisioner.provision(node, context);
+
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+        assertThat(channelOps.channels.containsKey("dev/work")).isTrue();
+    }
+
+    @Test
+    void reEntryWithValidApprovalProvisions() {
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+
+        // First call — gets PendingApproval
+        var firstResult = provisioner.provision(node, new ProvisionContext("tenant-1", emptyGraph));
+        assertThat(firstResult).isInstanceOf(ProvisionResult.PendingApproval.class);
+        var pending = (ProvisionResult.PendingApproval) firstResult;
+        String planRef = pending.planReference();
+
+        // Re-entry with approval
+        var approval = new PlanApproval(planRef, "admin", Instant.now());
+        var reEntryContext = new ProvisionContext("tenant-1", emptyGraph, approval);
+
+        var result = provisioner.provision(node, reEntryContext);
+
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+        // Plan should be removed after successful provision
+        assertThat(planStore.retrieve(planRef)).isEmpty();
+    }
+
+    @Test
+    void reEntryWithStaleSpecReEvaluates() {
+        var originalSpec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
+        var originalNode = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), originalSpec, false);
+
+        // First call — gets PendingApproval
+        var firstResult = provisioner.provision(originalNode, new ProvisionContext("tenant-1", emptyGraph));
+        assertThat(firstResult).isInstanceOf(ProvisionResult.PendingApproval.class);
+        var pending = (ProvisionResult.PendingApproval) firstResult;
+        String originalRef = pending.planReference();
+
+        // Spec changed between approval and re-entry
+        var changedSpec = new TrustPolicyNodeSpec("claims-routing", 0.95, 10, 0.1, 0.3, Map.of(), false);
+        var changedNode = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), changedSpec, false);
+
+        var approval = new PlanApproval(originalRef, "admin", Instant.now());
+        var reEntryContext = new ProvisionContext("tenant-1", emptyGraph, approval);
+
+        var result = provisioner.provision(changedNode, reEntryContext);
+
+        // Should get a new PendingApproval since spec changed and TrustPolicy is still HIGH risk
+        assertThat(result).isInstanceOf(ProvisionResult.PendingApproval.class);
+        var newPending = (ProvisionResult.PendingApproval) result;
+        // Original plan should be removed
+        assertThat(planStore.retrieve(originalRef)).isEmpty();
+        // New plan should be stored
+        assertThat(newPending.planReference()).isNotEqualTo(originalRef);
+        assertThat(planStore.retrieve(newPending.planReference())).isPresent();
+    }
+
+    @Test
+    void deprovisionApprovalFlow() {
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+
+        // Deprovision — should require approval
+        var deprovResult = provisioner.deprovision(node, new DeprovisionContext("tenant-1", emptyGraph));
+        assertThat(deprovResult).isInstanceOf(DeprovisionResult.PendingApproval.class);
+        var pending = (DeprovisionResult.PendingApproval) deprovResult;
+        String planRef = pending.planReference();
+        assertThat(planStore.retrieve(planRef)).isPresent();
+
+        // Re-entry with approval
+        var approval = new PlanApproval(planRef, "admin", Instant.now());
+        var reEntryContext = new DeprovisionContext("tenant-1", emptyGraph, approval);
+
+        var result = provisioner.deprovision(node, reEntryContext);
+
+        assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+        assertThat(planStore.retrieve(planRef)).isEmpty();
     }
 
     // Test stubs

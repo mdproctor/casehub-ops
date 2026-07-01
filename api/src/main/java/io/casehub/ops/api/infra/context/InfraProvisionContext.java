@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 import io.casehub.desiredstate.api.NodeId;
+import io.casehub.ops.api.approval.ApprovalThresholds;
 import io.casehub.ops.api.infra.plan.ProvisionPlan;
 
 public record InfraProvisionContext(
@@ -12,7 +13,7 @@ public record InfraProvisionContext(
         ProvisionPhase phase,
         ProvisionAction action,
         ProvisionPlan approvedPlan,
-        RiskThresholds thresholds,
+        ApprovalThresholds thresholds,
         Instant requestedAt) {
 
     public InfraProvisionContext {

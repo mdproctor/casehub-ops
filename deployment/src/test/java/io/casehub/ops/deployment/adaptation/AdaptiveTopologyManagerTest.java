@@ -1,12 +1,13 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
-import io.casehub.desiredstate.api.SituationChangeEvent;
-import io.casehub.desiredstate.api.SituationSource;
+import io.casehub.ras.api.ActiveSituation;
+import io.casehub.ras.api.SituationChangeEvent;
+import io.casehub.ras.api.SituationSource;
+import io.smallrye.mutiny.Uni;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.ops.api.deployment.AdaptationActionSpec;
 import io.casehub.ops.api.deployment.AdaptationRuleSpec;
@@ -70,7 +71,7 @@ class AdaptiveTopologyManagerTest {
         var goals = goalsWithAgentAndRules("risk-agent", List.of(rule));
 
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("high-load", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("high-load", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -98,9 +99,9 @@ class AdaptiveTopologyManagerTest {
 
         // Situation fires after initialization
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 1.0, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 1.0, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         assertThat(reconciliationLoop.updateDesiredCalls).hasSize(1);
         assertThat(reconciliationLoop.requestReconciliationCalls).hasSize(1);
@@ -129,7 +130,7 @@ class AdaptiveTopologyManagerTest {
         // No situations active
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         // updateDesired is still called (recompiles base), but graph has no adaptations
         assertThat(reconciliationLoop.updateDesiredCalls).hasSize(1);
@@ -140,7 +141,7 @@ class AdaptiveTopologyManagerTest {
 
     @Test
     void unknownTenancyIdIsNoop() {
-        manager.onSituationChange(new SituationChangeEvent("unknown-tenant"));
+        manager.onSituationChange(new SituationChangeEvent("unknown-tenant", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         assertThat(reconciliationLoop.updateDesiredCalls).isEmpty();
         assertThat(reconciliationLoop.requestReconciliationCalls).isEmpty();
@@ -167,7 +168,7 @@ class AdaptiveTopologyManagerTest {
 
         // First: activate with confidence above minConfidence
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationLoop.clear();
@@ -175,9 +176,9 @@ class AdaptiveTopologyManagerTest {
         // Drop confidence into hysteresis band (0.65 is above 0.5 deactivateBelow,
         // below 0.7 minConfidence) → should stay active
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.65, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.65, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Still adapted — the add action produced forensics-agent alongside risk-agent
@@ -196,16 +197,16 @@ class AdaptiveTopologyManagerTest {
 
         // First: activate with confidence above minConfidence
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationLoop.clear();
 
         // Drop confidence below deactivateBelow → should deactivate
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.4, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.4, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // No adaptations — confidence below deactivateBelow, rule deactivated
@@ -234,7 +235,7 @@ class AdaptiveTopologyManagerTest {
 
         // Activate with high confidence
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationLoop.clear();
@@ -242,9 +243,9 @@ class AdaptiveTopologyManagerTest {
         // Immediately try to deactivate (confidence below deactivateBelow, within cooldown window)
         // Cooldown should prevent deactivation → rule stays active
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.3, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.3, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Cooldown prevents deactivation — forensics-agent still present
@@ -265,7 +266,7 @@ class AdaptiveTopologyManagerTest {
 
         // Activate
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.9, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationLoop.clear();
@@ -273,7 +274,7 @@ class AdaptiveTopologyManagerTest {
         // Situation disappears entirely
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Back to base topology — only the original agent
@@ -296,8 +297,8 @@ class AdaptiveTopologyManagerTest {
 
         // Both situations active
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("situation-a", 0.9, Map.of(), Instant.now()),
-            new ActiveSituation("situation-b", 0.9, Map.of(), Instant.now())));
+            new ActiveSituation("situation-a", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0),
+            new ActiveSituation("situation-b", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0)));
 
         // Should not throw — conflict is logged as warning, not an error
         manager.initialize("tenant-1", goals);
@@ -324,7 +325,7 @@ class AdaptiveTopologyManagerTest {
 
         // Silently add a situation (no CDI event fired)
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.9, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0)));
 
         // Trigger manual poll (simulates what the scheduled executor would do)
         manager.pollAllTenants();
@@ -369,7 +370,7 @@ class AdaptiveTopologyManagerTest {
         var goals = goalsWithAgentAndRules("triage-agent", List.of(rule));
 
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("active-breach", 0.95, Map.of(), Instant.now())));
+            new ActiveSituation("active-breach", "_singleton", "tenant-1", 0.95, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -398,7 +399,7 @@ class AdaptiveTopologyManagerTest {
             List.of(rule));
 
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("market-anomaly", 0.8, Map.of(), Instant.now())));
+            new ActiveSituation("market-anomaly", "_singleton", "tenant-1", 0.8, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -420,7 +421,7 @@ class AdaptiveTopologyManagerTest {
 
         // Tenant-1 has situation, tenant-2 doesn't
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("high-load", 0.9, Map.of(), Instant.now())));
+            new ActiveSituation("high-load", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0)));
         situationSource.setSituations("tenant-2", List.of());
 
         manager.initialize("tenant-1", goals);
@@ -470,8 +471,8 @@ class AdaptiveTopologyManagerTest {
         }
 
         @Override
-        public List<ActiveSituation> activeSituations(String tenancyId) {
-            return situations.getOrDefault(tenancyId, List.of());
+        public Uni<List<ActiveSituation>> activeSituations(String tenancyId) {
+            return Uni.createFrom().item(situations.getOrDefault(tenancyId, List.of()));
         }
     }
 

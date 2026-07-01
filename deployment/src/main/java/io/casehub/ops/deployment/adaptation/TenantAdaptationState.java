@@ -1,6 +1,6 @@
 package io.casehub.ops.deployment.adaptation;
 
-import io.casehub.desiredstate.api.ActiveSituation;
+import io.casehub.ras.api.ActiveSituation;
 import io.casehub.ops.api.deployment.DeploymentGoals;
 
 import java.time.Duration;

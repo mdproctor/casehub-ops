@@ -4,20 +4,21 @@ import java.util.List;
 import java.util.Objects;
 
 import io.casehub.desiredstate.api.NodeId;
-import io.casehub.ops.api.infra.context.RiskClassification;
+import io.casehub.ops.api.approval.PlanDetail;
+import io.casehub.ops.api.approval.RiskClassification;
 
 public record ProvisionPlan(
         NodeId nodeId,
         List<PlannedChange> changes,
         RiskClassification risk,
-        String humanReadableSummary,
-        ToolPlanDetail toolDetail) {
+        String summary,
+        ToolPlanDetail toolDetail) implements PlanDetail {
 
     public ProvisionPlan {
         Objects.requireNonNull(nodeId, "nodeId");
         changes = changes != null ? List.copyOf(changes) : List.of();
         Objects.requireNonNull(risk, "risk");
-        Objects.requireNonNull(humanReadableSummary, "humanReadableSummary");
+        Objects.requireNonNull(summary, "summary");
         // toolDetail nullable
     }
 }

@@ -19,6 +19,9 @@ import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
+import io.casehub.ops.api.approval.ApprovalDecision;
+import io.casehub.ops.api.approval.ApprovalEvaluator;
+import io.casehub.ops.api.approval.InMemoryPlanStore;
 import io.casehub.ops.api.infra.goal.InfraGoals;
 import io.casehub.ops.api.infra.goal.ResourceDeclaration;
 import io.casehub.ops.api.infra.spi.InfraBackend;
@@ -51,7 +54,8 @@ class InfraLifecycleIntegrationTest {
         standaloneBackend = new StandaloneBackend(List.<ResourceProvisioner>of(provisioner));
         var backends = List.<InfraBackend>of(standaloneBackend);
         compiler = new InfraGoalCompiler();
-        nodeProvisioner = new InfraNodeProvisioner(backends);
+        ApprovalEvaluator autoApprove = (node, action, tenancyId) -> new ApprovalDecision.AutoApproved();
+        nodeProvisioner = new InfraNodeProvisioner(backends, autoApprove, new InMemoryPlanStore());
         stateAdapter = new InfraActualStateAdapter(backends);
     }
 

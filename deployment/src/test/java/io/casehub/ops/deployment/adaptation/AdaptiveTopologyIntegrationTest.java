@@ -1,12 +1,13 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.ActiveSituation;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
-import io.casehub.desiredstate.api.SituationChangeEvent;
-import io.casehub.desiredstate.api.SituationSource;
+import io.casehub.ras.api.ActiveSituation;
+import io.casehub.ras.api.SituationChangeEvent;
+import io.casehub.ras.api.SituationSource;
+import io.smallrye.mutiny.Uni;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.ops.api.deployment.DeploymentGoals;
 import io.casehub.ops.api.deployment.TrustPolicyNodeSpec;
@@ -109,7 +110,7 @@ class AdaptiveTopologyIntegrationTest {
         // Effective = (0.85 - 0.7) / (1.0 - 0.7) = 0.15 / 0.3 = 0.5
         // Instances = 1 + (max - min) * effective = 1 + (5 - 1) * 0.5 = 1 + 2 = 3
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -133,7 +134,7 @@ class AdaptiveTopologyIntegrationTest {
         DeploymentGoals goals = loader.load("test-deployment/adaptive-topology.yaml");
 
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("market-anomaly", 0.7, Map.of(), Instant.now())));
+            new ActiveSituation("market-anomaly", "_singleton", "tenant-1", 0.7, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -153,8 +154,8 @@ class AdaptiveTopologyIntegrationTest {
         DeploymentGoals goals = loader.load("test-deployment/adaptive-topology.yaml");
 
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now()),
-            new ActiveSituation("market-anomaly", 0.7, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0),
+            new ActiveSituation("market-anomaly", "_singleton", "tenant-1", 0.7, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
 
@@ -180,7 +181,7 @@ class AdaptiveTopologyIntegrationTest {
 
         // Start with situation active
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationTarget.clear();
@@ -188,7 +189,7 @@ class AdaptiveTopologyIntegrationTest {
         // Situation resolves
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;
@@ -212,16 +213,16 @@ class AdaptiveTopologyIntegrationTest {
 
         // Start with high confidence
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.9, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.9, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationTarget.clear();
 
         // Drop below deactivateBelow (0.5)
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.4, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.4, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;
@@ -238,7 +239,7 @@ class AdaptiveTopologyIntegrationTest {
         // Start with high confidence (0.85)
         // Effective = (0.85 - 0.7) / (1.0 - 0.7) = 0.5 → instanceCount = 1 + (5-1)*0.5 = 3
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.85, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.85, Map.of(), Instant.now(), Instant.now(), 0)));
 
         manager.initialize("tenant-1", goals);
         reconciliationTarget.clear();
@@ -246,9 +247,9 @@ class AdaptiveTopologyIntegrationTest {
         // Lower confidence to 0.76
         // Effective = (0.76 - 0.7) / (1.0 - 0.7) = 0.2 → instanceCount = 1 + (5-1)*0.2 = 1.8 → 1
         situationSource.setSituations("tenant-1", List.of(
-            new ActiveSituation("volatility-spike", 0.76, Map.of(), Instant.now())));
+            new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.76, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1"));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;
@@ -274,8 +275,8 @@ class AdaptiveTopologyIntegrationTest {
         }
 
         @Override
-        public List<ActiveSituation> activeSituations(String tenancyId) {
-            return situations.getOrDefault(tenancyId, List.of());
+        public Uni<List<ActiveSituation>> activeSituations(String tenancyId) {
+            return Uni.createFrom().item(situations.getOrDefault(tenancyId, List.of()));
         }
     }
 
