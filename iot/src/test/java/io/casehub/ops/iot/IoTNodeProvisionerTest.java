@@ -96,10 +96,10 @@ class IoTNodeProvisionerTest {
     }
 
     @Test
-    void physicalProvision_returnsFailed() {
+    void physicalProvision_rejectedAsUnknownSpec() {
         var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
         var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"),
-            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), true);
+            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), false);
         var result = provisioner.provision(node, context());
 
         assertThat(result).isInstanceOf(ProvisionResult.Failed.class);
@@ -109,6 +109,16 @@ class IoTNodeProvisionerTest {
     void configDeprovision_returnsSuccess() {
         var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
         var node = configNode("sw-1", DeviceClass.SWITCH, Map.of("isOn", true));
+        var result = provisioner.deprovision(node, deprovisionContext());
+
+        assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+    }
+
+    @Test
+    void physicalDeprovision_returnsSuccess() {
+        var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
+        var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"),
+            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), false);
         var result = provisioner.deprovision(node, deprovisionContext());
 
         assertThat(result).isInstanceOf(DeprovisionResult.Success.class);

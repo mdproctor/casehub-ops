@@ -30,4 +30,9 @@ public record ComplianceControlSpec(
                 ? Collections.unmodifiableMap(new LinkedHashMap<>(properties))
                 : Map.of();
     }
+
+    @Override
+    public boolean requiresHuman() {
+        return requiresHumanReview();
+    }
 }

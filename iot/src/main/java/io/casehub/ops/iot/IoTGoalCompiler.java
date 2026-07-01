@@ -40,7 +40,7 @@ public class IoTGoalCompiler implements GoalCompiler<IoTGoals> {
                 nodes.add(new DesiredNode(
                     NodeId.of(goal.deviceId()), PHYSICAL_DEVICE,
                     new PhysicalDeviceSpec(goal.deviceId(), goal.deviceClass(), goal.label()),
-                    true));
+                    false));
                 nodes.add(new DesiredNode(
                     NodeId.of(goal.deviceId() + "-config"), DEVICE_CONFIG,
                     new DeviceConfigSpec(goal.deviceId(), goal.deviceClass(), goal.config()),

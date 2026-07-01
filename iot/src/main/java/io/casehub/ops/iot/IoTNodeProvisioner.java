@@ -70,7 +70,7 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     @Override
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {
-        if (!(node.spec() instanceof PhysicalDeviceSpec || node.spec() instanceof DeviceConfigSpec)) {
+        if (!(node.spec() instanceof DeviceConfigSpec)) {
             return new ProvisionResult.Failed("unknown spec type: " + node.spec().getClass());
         }
 
@@ -169,8 +169,6 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     private ProvisionResult doProvision(DesiredNode node, ProvisionContext context) {
         return switch (node.spec()) {
-            case PhysicalDeviceSpec s ->
-                new ProvisionResult.Failed("physical devices cannot be auto-provisioned");
             case DeviceConfigSpec s -> provisionConfig(s);
             default -> new ProvisionResult.Failed("unknown spec type: " + node.spec().getClass());
         };
@@ -178,8 +176,7 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     private DeprovisionResult doDeprovision(DesiredNode node, DeprovisionContext context) {
         return switch (node.spec()) {
-            case PhysicalDeviceSpec s ->
-                new DeprovisionResult.Failed("physical devices cannot be auto-deprovisioned");
+            case PhysicalDeviceSpec s -> new DeprovisionResult.Success();
             case DeviceConfigSpec s -> new DeprovisionResult.Success();
             default -> new DeprovisionResult.Failed("unknown spec type");
         };

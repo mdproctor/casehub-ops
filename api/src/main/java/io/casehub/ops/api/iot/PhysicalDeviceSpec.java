@@ -13,4 +13,9 @@ public record PhysicalDeviceSpec(
         Objects.requireNonNull(deviceClass, "deviceClass required");
         Objects.requireNonNull(label, "label required");
     }
+
+    @Override
+    public boolean requiresHuman() {
+        return true;
+    }
 }

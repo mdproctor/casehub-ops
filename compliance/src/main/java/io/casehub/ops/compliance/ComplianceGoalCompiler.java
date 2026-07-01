@@ -20,7 +20,7 @@ public class ComplianceGoalCompiler implements GoalCompiler<ComplianceGoals> {
                     NodeId.of(spec.controlId()),
                     NodeType.of(spec.controlType()),
                     spec,
-                    spec.requiresHumanReview()));
+                    false));
 
             for (String depId : entry.dependsOn()) {
                 deps.add(new Dependency(NodeId.of(spec.controlId()), NodeId.of(depId)));

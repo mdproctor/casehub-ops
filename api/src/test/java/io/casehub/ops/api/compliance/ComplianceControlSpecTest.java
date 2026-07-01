@@ -113,4 +113,20 @@ class ComplianceControlSpecTest {
         var goals = new ComplianceGoals(null);
         assertThat(goals.controls()).isEmpty();
     }
+
+    @Test
+    void requiresHuman_delegatesToRequiresHumanReview_true() {
+        var spec = new ComplianceControlSpec(
+            "access-review", "ACCESS_REVIEW", "Access Review", "Quarterly",
+            List.of(), 90, true, Map.of());
+        assertThat(spec.requiresHuman()).isTrue();
+    }
+
+    @Test
+    void requiresHuman_delegatesToRequiresHumanReview_false() {
+        var spec = new ComplianceControlSpec(
+            "encryption", "ENCRYPTION_AT_REST", "Encryption", "AES-256",
+            List.of(), 30, false, Map.of());
+        assertThat(spec.requiresHuman()).isFalse();
+    }
 }
