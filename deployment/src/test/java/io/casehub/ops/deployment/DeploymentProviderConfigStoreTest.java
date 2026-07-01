@@ -101,4 +101,52 @@ class DeploymentProviderConfigStoreTest {
         assertThatThrownBy(() -> retrieved.put("k8s", new ProviderConfig("k8s", Map.of())))
             .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void agentIdsForProvider_returnsMatchingAgents() {
+        store.store("agent-1", List.of(
+            new ProviderConfig("claudony", Map.of()),
+            new ProviderConfig("openclaw", Map.of())));
+        store.store("agent-2", List.of(
+            new ProviderConfig("claudony", Map.of())));
+        store.store("agent-3", List.of(
+            new ProviderConfig("openclaw", Map.of())));
+
+        assertThat(store.agentIdsForProvider("claudony"))
+            .containsExactlyInAnyOrder("agent-1", "agent-2");
+        assertThat(store.agentIdsForProvider("openclaw"))
+            .containsExactlyInAnyOrder("agent-1", "agent-3");
+    }
+
+    @Test
+    void agentIdsForProvider_unknownProviderReturnsEmpty() {
+        store.store("agent-1", List.of(new ProviderConfig("claudony", Map.of())));
+        assertThat(store.agentIdsForProvider("nonexistent")).isEmpty();
+    }
+
+    @Test
+    void agentIdsForProvider_reflectsRemoval() {
+        store.store("agent-1", List.of(new ProviderConfig("claudony", Map.of())));
+        store.store("agent-2", List.of(new ProviderConfig("claudony", Map.of())));
+        store.remove("agent-1");
+        assertThat(store.agentIdsForProvider("claudony")).containsExactly("agent-2");
+    }
+
+    @Test
+    void agentIdsForProvider_handlesProviderChange() {
+        store.store("agent-1", List.of(new ProviderConfig("claudony", Map.of())));
+        assertThat(store.agentIdsForProvider("claudony")).containsExactly("agent-1");
+        assertThat(store.agentIdsForProvider("openclaw")).isEmpty();
+
+        store.store("agent-1", List.of(new ProviderConfig("openclaw", Map.of())));
+        assertThat(store.agentIdsForProvider("claudony")).isEmpty();
+        assertThat(store.agentIdsForProvider("openclaw")).containsExactly("agent-1");
+    }
+
+    @Test
+    void agentIdsForProvider_isUnmodifiable() {
+        store.store("agent-1", List.of(new ProviderConfig("claudony", Map.of())));
+        assertThatThrownBy(() -> store.agentIdsForProvider("claudony").add("agent-2"))
+            .isInstanceOf(UnsupportedOperationException.class);
+    }
 }

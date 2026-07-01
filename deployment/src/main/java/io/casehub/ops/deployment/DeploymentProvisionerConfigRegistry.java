@@ -6,7 +6,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class DeploymentProvisionerConfigRegistry implements ProvisionerConfigRegistry {
@@ -26,8 +25,6 @@ public class DeploymentProvisionerConfigRegistry implements ProvisionerConfigReg
 
     @Override
     public Set<String> declaredAgentIds(String providerName) {
-        return store.agentIds().stream()
-            .filter(agentId -> store.forAgent(agentId).containsKey(providerName))
-            .collect(Collectors.toUnmodifiableSet());
+        return store.agentIdsForProvider(providerName);
     }
 }
