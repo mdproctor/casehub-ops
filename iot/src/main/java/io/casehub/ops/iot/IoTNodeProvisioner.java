@@ -57,6 +57,10 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     @Override
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {
+        if (!(node.spec() instanceof PhysicalDeviceSpec || node.spec() instanceof DeviceConfigSpec)) {
+            return new ProvisionResult.Failed("unknown spec type: " + node.spec().getClass());
+        }
+
         if (context.hasApproval()) {
             return handleProvisionReEntry(node, context);
         }
@@ -72,6 +76,10 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     @Override
     public DeprovisionResult deprovision(DesiredNode node, DeprovisionContext context) {
+        if (!(node.spec() instanceof PhysicalDeviceSpec || node.spec() instanceof DeviceConfigSpec)) {
+            return new DeprovisionResult.Failed("unknown spec type: " + node.spec().getClass());
+        }
+
         if (context.hasApproval()) {
             return handleDeprovisionReEntry(node, context);
         }
