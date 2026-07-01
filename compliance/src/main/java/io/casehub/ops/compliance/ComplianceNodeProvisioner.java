@@ -6,6 +6,8 @@ import io.casehub.ops.api.compliance.ComplianceControlSpec;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.Set;
+
 @ApplicationScoped
 public class ComplianceNodeProvisioner implements NodeProvisioner {
 
@@ -27,6 +29,17 @@ public class ComplianceNodeProvisioner implements NodeProvisioner {
         this.specHashStore = specHashStore;
         this.approvalEvaluator = approvalEvaluator;
         this.planStore = planStore;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(
+                NodeType.of("LOG_RETENTION"),
+                NodeType.of("ENCRYPTION_AT_REST"),
+                NodeType.of("ACCESS_REVIEW"),
+                NodeType.of("INCIDENT_RESPONSE"),
+                NodeType.of("DATA_PROCESSING"),
+                NodeType.of("AI_RISK_ASSESSMENT"));
     }
 
     @Override

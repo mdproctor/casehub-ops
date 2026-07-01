@@ -4,6 +4,7 @@ import io.casehub.desiredstate.api.DeprovisionContext;
 import io.casehub.desiredstate.api.DeprovisionResult;
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.NodeProvisioner;
+import io.casehub.desiredstate.api.NodeType;
 import io.casehub.desiredstate.api.ProvisionContext;
 import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.desiredstate.api.StepAction;
@@ -19,9 +20,11 @@ import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -53,6 +56,16 @@ public class IoTNodeProvisioner implements NodeProvisioner {
         providerList.forEach(p -> providers.put(p.providerId(), p));
         this.approvalEvaluator = approvalEvaluator;
         this.planStore = planStore;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(NodeType.of("physical-device"), NodeType.of("device-config"));
+    }
+
+    @Override
+    public Duration resyncInterval() {
+        return Duration.ofSeconds(30);
     }
 
     @Override

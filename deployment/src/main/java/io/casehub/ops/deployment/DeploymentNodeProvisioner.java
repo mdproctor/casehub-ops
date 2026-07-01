@@ -9,6 +9,8 @@ import io.casehub.ops.api.approval.*;
 import io.casehub.ops.api.deployment.*;
 import io.casehub.ops.deployment.handler.*;
 
+import java.util.Set;
+
 @ApplicationScoped
 public class DeploymentNodeProvisioner implements NodeProvisioner {
 
@@ -40,6 +42,16 @@ public class DeploymentNodeProvisioner implements NodeProvisioner {
         this.specHashStore = specHashStore;
         this.approvalEvaluator = approvalEvaluator;
         this.planStore = planStore;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(
+                NodeType.of("agent"),
+                NodeType.of("channel"),
+                NodeType.of("case_type"),
+                NodeType.of("trust_policy"),
+                NodeType.of("endpoint"));
     }
 
     @Override
