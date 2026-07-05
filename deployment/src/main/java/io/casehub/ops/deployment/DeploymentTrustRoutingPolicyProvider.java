@@ -17,6 +17,11 @@ public class DeploymentTrustRoutingPolicyProvider implements TrustRoutingPolicyP
     private final ConcurrentHashMap<String, TrustRoutingPolicy> policies = new ConcurrentHashMap<>();
 
     @Override
+    public String id() {
+        return "ops-deployment";
+    }
+
+    @Override
     public TrustRoutingPolicy forCapability(String capabilityName) {
         return policies.getOrDefault(capabilityName, TrustRoutingPolicy.DEFAULT);
     }
