@@ -24,6 +24,7 @@ continuous compliance posture (vs. point-in-time audit prep tools).
 
 ```bash
 mvn --batch-mode install
+mvn --batch-mode -o test -pl app      # app/ tests — offline avoids GitHub Packages metadata hang
 mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 ```
 
@@ -37,6 +38,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `compliance/` | `casehub-ops-compliance` | `io.casehub.ops.compliance` | Compliance posture — SOC2/GDPR/EU-AI-Act/DORA/NIS2 |
 | `iot/` | `casehub-ops-iot` | `io.casehub.ops.iot` | IoT desired state — physical + logical node provisioning |
 | `testing/` | `casehub-ops-testing` | `io.casehub.ops.testing` | Shared test fixtures. **Test scope only.** |
+| `app/` | `casehub-ops-app` | `io.casehub.ops.app` | Operational console — Quarkus application embedding engine + desiredstate. NOT a domain module. |
 
 ## Domain Priority
 
@@ -53,6 +55,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 - All reconciliation events flow through `EventSource.stream()` → ReconciliationLoop in the runtime
 - Pruning always before growing — dependency-aware ordering guaranteed by the runtime TransitionPlanner
 - tenancyId propagated through all calls — bind in repository/adapter layer only
+- `app/` implements the desiredstate SPI quad directly — NOT a domain module. No domain modules on the classpath (ARC42STORIES §2 single-domain CDI constraint)
 
 ## Architecture Record
 

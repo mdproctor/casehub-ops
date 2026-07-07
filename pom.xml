@@ -23,6 +23,7 @@
 
     <modules>
         <module>api</module>
+        <module>app</module>
         <module>deployment</module>
         <module>infra</module>
         <module>compliance</module>
@@ -40,6 +41,11 @@
             <dependency>
                 <groupId>io.casehub</groupId>
                 <artifactId>casehub-ops-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.casehub</groupId>
+                <artifactId>casehub-ops-app</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

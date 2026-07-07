@@ -82,6 +82,7 @@ class InfraNodeSpecTest {
             case K8sDeploymentSpec d -> "deployment:" + d.name();
             case K8sServiceSpec s -> "service:" + s.name();
             case K8sIngressSpec i -> "ingress:" + i.name();
+            case K8sConfigMapSpec cm -> "configmap:" + cm.name();
             case ComputeInstanceSpec c -> "compute:" + c.provider();
             case DatabaseClusterSpec db -> "db:" + db.engine();
             case TerraformWorkspaceSpec tf -> "tf:" + tf.workspacePath();
