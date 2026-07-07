@@ -34,7 +34,6 @@ public record ComplianceControlSpec(
                 : Map.of();
     }
 
-    @Override
     public boolean requiresHuman() {
         return requiresHumanReview();
     }
