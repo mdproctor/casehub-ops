@@ -57,7 +57,7 @@ class ComplianceActualStateAdapterTest {
         var specOld = minimalSpec("enc", "ENCRYPTION_AT_REST");
         specHashStore.record(NodeId.of("enc"), specOld);
         var specNew = new ComplianceControlSpec(
-                "enc", "ENCRYPTION_AT_REST", "Changed", "D", List.of(), 30, false, Map.of());
+                "enc", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Changed", "D", List.of(), 30, false, Map.of());
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), specNew, false);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
@@ -101,7 +101,7 @@ class ComplianceActualStateAdapterTest {
     }
 
     private ComplianceControlSpec minimalSpec(String id, String type) {
-        return new ComplianceControlSpec(id, type, "Title", "Desc", List.of(), 30, false, Map.of());
+        return new ComplianceControlSpec(id, type, "FILE_EXISTENCE", "Title", "Desc", List.of(), 30, false, Map.of());
     }
 
     // Test stub that allows controlled evidenceStatus returns

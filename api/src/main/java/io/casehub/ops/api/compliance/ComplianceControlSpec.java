@@ -11,6 +11,7 @@ import java.util.Map;
 public record ComplianceControlSpec(
         String controlId,
         String controlType,
+        String strategy,
         String title,
         String description,
         List<FrameworkMapping> frameworks,
@@ -23,6 +24,8 @@ public record ComplianceControlSpec(
             throw new IllegalArgumentException("controlId is required");
         if (controlType == null || controlType.isBlank())
             throw new IllegalArgumentException("controlType is required");
+        if (strategy == null || strategy.isBlank())
+            throw new IllegalArgumentException("strategy is required");
         if (evidenceMaxAgeDays <= 0)
             throw new IllegalArgumentException("evidenceMaxAgeDays must be positive");
         frameworks = frameworks != null ? List.copyOf(frameworks) : List.of();

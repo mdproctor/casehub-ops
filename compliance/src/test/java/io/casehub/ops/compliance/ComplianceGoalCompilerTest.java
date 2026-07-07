@@ -20,17 +20,23 @@ class ComplianceGoalCompilerTest {
         factory = new DefaultDesiredStateGraphFactory();
     }
 
+    private DesiredStateGraph compileToGraph(ComplianceGoals goals) {
+        var result = compiler.compile(goals, factory);
+        assertThat(result).isInstanceOf(CompilationResult.SingleGraph.class);
+        return ((CompilationResult.SingleGraph) result).graph();
+    }
+
     @Test
     void compilesControlNode() {
         var spec = new ComplianceControlSpec(
-                "encryption-at-rest", "ENCRYPTION_AT_REST",
+                "encryption-at-rest", "ENCRYPTION_AT_REST", "FILE_EXISTENCE",
                 "Encryption", "AES-256",
                 List.of(new FrameworkMapping("SOC2", "CC6.1")),
                 30, false, Map.of("cipher", "AES-256"));
         var goals = new ComplianceGoals(
                 List.of(new ComplianceGoalEntry(spec, List.of())));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = compileToGraph(goals);
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("encryption-at-rest"));
@@ -43,13 +49,13 @@ class ComplianceGoalCompilerTest {
     @Test
     void humanReviewControlSetsRequiresHuman() {
         var spec = new ComplianceControlSpec(
-                "access-review", "ACCESS_REVIEW",
+                "access-review", "ACCESS_REVIEW", "FILE_EXISTENCE",
                 "Access Review", "Quarterly",
                 List.of(), 90, true, Map.of());
         var goals = new ComplianceGoals(
                 List.of(new ComplianceGoalEntry(spec, List.of())));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = compileToGraph(goals);
 
         assertThat(graph.nodes().get(NodeId.of("access-review")).requiresHuman()).isTrue();
     }
@@ -57,16 +63,16 @@ class ComplianceGoalCompilerTest {
     @Test
     void dependsOnCreatesDependencyEdges() {
         var spec1 = new ComplianceControlSpec(
-                "data-processing", "DATA_PROCESSING",
+                "data-processing", "DATA_PROCESSING", "FILE_EXISTENCE",
                 "DP", "Records", List.of(), 30, false, Map.of());
         var spec2 = new ComplianceControlSpec(
-                "ai-risk", "AI_RISK_ASSESSMENT",
+                "ai-risk", "AI_RISK_ASSESSMENT", "FILE_EXISTENCE",
                 "AI", "Risk", List.of(), 365, true, Map.of());
         var goals = new ComplianceGoals(List.of(
                 new ComplianceGoalEntry(spec1, List.of()),
                 new ComplianceGoalEntry(spec2, List.of("data-processing"))));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = compileToGraph(goals);
 
         assertThat(graph.nodes()).hasSize(2);
         assertThat(graph.dependencies()).hasSize(1);
@@ -78,16 +84,16 @@ class ComplianceGoalCompilerTest {
     @Test
     void emptyGoalsProducesEmptyGraph() {
         var goals = new ComplianceGoals(List.of());
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = compileToGraph(goals);
         assertThat(graph.nodes()).isEmpty();
         assertThat(graph.dependencies()).isEmpty();
     }
 
     @Test
-    void compilesAllSixControlTypes() {
+    void compilesAllControlTypes() {
         var goals = new ComplianceGoalLoader().load("test-compliance/all-controls.yaml");
-        DesiredStateGraph graph = compiler.compile(goals, factory);
-        assertThat(graph.nodes()).hasSize(6);
+        DesiredStateGraph graph = compileToGraph(goals);
+        assertThat(graph.nodes()).hasSize(8);
         assertThat(graph.dependencies()).hasSize(1);
     }
 }

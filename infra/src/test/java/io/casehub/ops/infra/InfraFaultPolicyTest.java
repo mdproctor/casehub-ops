@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.FaultEvent;
 import io.casehub.desiredstate.api.FaultType;
@@ -24,7 +25,7 @@ class InfraFaultPolicyTest {
     void nodeDestroyedReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.NODE_DESTROYED, "instance terminated externally");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }
@@ -33,7 +34,7 @@ class InfraFaultPolicyTest {
     void nodeDegradedReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.NODE_DEGRADED, "high latency detected");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }
@@ -42,7 +43,7 @@ class InfraFaultPolicyTest {
     void provisionFailedReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.PROVISION_FAILED, "resource type not supported");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }
@@ -51,7 +52,7 @@ class InfraFaultPolicyTest {
     void deprovisionFailedReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.DEPROVISION_FAILED, "cleanup failed");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }
@@ -60,7 +61,7 @@ class InfraFaultPolicyTest {
     void humanNodeTimeoutReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.HUMAN_NODE_TIMEOUT, "approval timed out");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }
@@ -69,7 +70,7 @@ class InfraFaultPolicyTest {
     void dependencyUnavailableReturnsNoMutation() {
         var event = new FaultEvent(NODE_1, FaultType.DEPENDENCY_UNAVAILABLE, "upstream node absent");
 
-        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty());
+        List<GraphMutation> result = policy.onFault(event, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(result).isEmpty();
     }

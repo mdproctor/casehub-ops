@@ -2,6 +2,7 @@ controls:
   - spec:
       controlId: encryption-at-rest
       controlType: ENCRYPTION_AT_REST
+      strategy: FILE_EXISTENCE
       title: "Encryption at Rest"
       description: "AES-256 required"
       frameworks:
@@ -12,4 +13,5 @@ controls:
       evidenceMaxAgeDays: 30
       requiresHumanReview: false
       properties:
+        filePath: /etc/security/encryption-config.yaml
         cipher: AES-256

@@ -1,8 +1,8 @@
 package io.casehub.ops.iot;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
-import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.GoalCompiler;
 import io.casehub.desiredstate.api.NodeId;
@@ -23,7 +23,7 @@ public class IoTGoalCompiler implements GoalCompiler<IoTGoals> {
     private static final NodeType DEVICE_CONFIG = NodeType.of("device-config");
 
     @Override
-    public DesiredStateGraph compile(IoTGoals goals, DesiredStateGraphFactory factory) {
+    public CompilationResult compile(IoTGoals goals, DesiredStateGraphFactory factory) {
         Map<String, IoTDeviceGoal> lookup = new HashMap<>();
         for (IoTDeviceGoal goal : goals.devices()) {
             if (lookup.containsKey(goal.deviceId())) {
@@ -59,6 +59,6 @@ public class IoTGoalCompiler implements GoalCompiler<IoTGoals> {
             }
         }
 
-        return factory.of(nodes, deps);
+        return CompilationResult.single(factory.of(nodes, deps));
     }
 }

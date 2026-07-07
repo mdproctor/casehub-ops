@@ -2,6 +2,7 @@ controls:
   - spec:
       controlId: encryption-at-rest
       controlType: ENCRYPTION_AT_REST
+      strategy: FILE_EXISTENCE
       title: "Encryption at Rest"
       description: "AES-256 required"
       frameworks:
@@ -10,10 +11,12 @@ controls:
       evidenceMaxAgeDays: 30
       requiresHumanReview: false
       properties:
+        filePath: /etc/security/encryption-config.yaml
         cipher: AES-256
   - spec:
       controlId: log-retention-policy
       controlType: LOG_RETENTION
+      strategy: LOG_DIRECTORY
       title: "Log Retention Policy"
       description: "1 year retention"
       frameworks:
@@ -22,10 +25,12 @@ controls:
       evidenceMaxAgeDays: 90
       requiresHumanReview: false
       properties:
+        logDirectory: /var/log/audit
         retentionDays: 365
   - spec:
       controlId: access-review-quarterly
       controlType: ACCESS_REVIEW
+      strategy: FILE_EXISTENCE
       title: "Quarterly Access Review"
       description: "All user access reviewed quarterly"
       frameworks:
@@ -34,10 +39,12 @@ controls:
       evidenceMaxAgeDays: 90
       requiresHumanReview: true
       properties:
+        filePath: /compliance/reviews/access-review-Q2-2026.pdf
         cadence: quarterly
   - spec:
       controlId: incident-response-playbook
       controlType: INCIDENT_RESPONSE
+      strategy: FILE_EXISTENCE
       title: "Incident Response Playbook"
       description: "Annual playbook test"
       frameworks:
@@ -46,10 +53,12 @@ controls:
       evidenceMaxAgeDays: 365
       requiresHumanReview: true
       properties:
+        filePath: /compliance/playbooks/incident-response-2026.pdf
         testCadence: annual
   - spec:
       controlId: data-processing-records
       controlType: DATA_PROCESSING
+      strategy: FILE_EXISTENCE
       title: "Data Processing Records"
       description: "GDPR Art.30 records"
       frameworks:
@@ -58,10 +67,12 @@ controls:
       evidenceMaxAgeDays: 30
       requiresHumanReview: false
       properties:
+        filePath: /compliance/gdpr/processing-records.json
         scope: all-processing-activities
   - spec:
       controlId: ai-risk-assessment
       controlType: AI_RISK_ASSESSMENT
+      strategy: FILE_EXISTENCE
       title: "AI System Risk Assessment"
       description: "EU AI Act Art.12"
       frameworks:
@@ -70,6 +81,36 @@ controls:
       evidenceMaxAgeDays: 365
       requiresHumanReview: true
       properties:
+        filePath: /compliance/ai/risk-assessment-2026.pdf
         riskTier: high
     dependsOn:
       - data-processing-records
+  - spec:
+      controlId: cert-mtls
+      controlType: CERTIFICATE_EXPIRY
+      strategy: CERTIFICATE_EXPIRY
+      title: "mTLS Certificate"
+      description: "mTLS cert must remain valid"
+      frameworks:
+        - framework: SOC2
+          requirement: CC6.6
+      evidenceMaxAgeDays: 30
+      requiresHumanReview: false
+      properties:
+        certPath: /etc/tls/mtls.pem
+        warningThresholdDays: 30
+  - spec:
+      controlId: config-baseline
+      controlType: CONFIG_HASH
+      strategy: CONFIG_HASH
+      title: "Config Baseline Integrity"
+      description: "Config file hash must match declared baseline"
+      frameworks:
+        - framework: SOC2
+          requirement: CC8.1
+      evidenceMaxAgeDays: 7
+      requiresHumanReview: false
+      properties:
+        filePath: /etc/app/config.yaml
+        expectedHash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        algorithm: SHA-256

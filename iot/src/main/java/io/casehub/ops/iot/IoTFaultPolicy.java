@@ -1,5 +1,6 @@
 package io.casehub.ops.iot;
 
+import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.FaultEvent;
 import io.casehub.desiredstate.api.FaultPolicy;
@@ -12,7 +13,7 @@ import java.util.List;
 public class IoTFaultPolicy implements FaultPolicy {
 
     @Override
-    public List<GraphMutation> onFault(FaultEvent event, DesiredStateGraph current) {
+    public List<GraphMutation> onFault(FaultEvent event, DesiredStateGraph current, ActualState actualState) {
         return List.of();
     }
 }

@@ -139,7 +139,7 @@ Three type strategies emerged across the domain modules, each fitting a differen
 |---|---|---|
 | Sealed hierarchy | Variants have different fields and provisioning semantics | `IoTNodeSpec` → `PhysicalDeviceSpec` (label, human-provisioned) vs `DeviceConfigSpec` (capabilities map, auto-provisioned) |
 | Sealed with wrapper | Backend routing metadata needed alongside domain spec | `InfraDesiredNodeSpec` wraps `InfraNodeSpec` + `backendId` |
-| Generic record with discriminator | Variants differ in configuration, not shape | `ComplianceControlSpec` with `controlType` discriminator |
+| Generic record with discriminator | Variants differ in configuration, not shape | `ComplianceControlSpec` with `controlType` (domain identity) + `strategy` (verification method routing) |
 
 The IoT domain confirmed this taxonomy: PhysicalDeviceSpec and DeviceConfigSpec have genuinely different provisioning semantics (human vs automated) and different fields — a structural difference requiring sealed hierarchy without wrapper.
 
@@ -433,8 +433,8 @@ Not closed here: no shared cross-domain abstractions — each domain's types are
 - `api/.../deployment/DeploymentNodeSpec.java` — sealed interface for topology node types (agent, channel, case type, trust policy)
 - `api/.../deployment/GoalEntry.java` — generic wrapper carrying dependsOn metadata for goal compilation
 - `api/.../deployment/NodeDriftChecker.java` — SPI for per-type drift detection against foundation APIs
-- `api/.../compliance/ComplianceControlSpec.java` — generic control spec with controlType discriminator and framework mappings
-- `api/.../compliance/EvidenceCollector.java` — SPI for configuration assertion checking per control type
+- `api/.../compliance/ComplianceControlSpec.java` — generic control spec with controlType (domain) + strategy (verification routing) and framework mappings
+- `api/.../compliance/EvidenceCollector.java` — SPI for evidence collection, routed by strategy (FILE_EXISTENCE, LOG_DIRECTORY, CERTIFICATE_EXPIRY, CONFIG_HASH)
 - `api/.../compliance/EvidenceResult.java` — sealed result: Pass, Fail, Unavailable
 - `api/.../iot/IoTNodeSpec.java` — sealed interface for IoT node types (physical device, device config)
 - `api/.../iot/PhysicalDeviceSpec.java` — physical device presence tracking (human-provisioned)

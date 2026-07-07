@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.casehub.desiredstate.api.ActualState;
+import io.casehub.desiredstate.api.CompilationResult;
+import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.FaultEvent;
 import io.casehub.desiredstate.api.FaultType;
@@ -106,7 +109,7 @@ class InfraLifecycleIntegrationTest {
         var goals = new InfraGoals("standalone", List.of(decl), List.of());
 
         // COMPILE
-        var graph = compiler.compile(goals, GRAPH_FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, GRAPH_FACTORY)).graph();
         assertThat(graph.nodes()).hasSize(1);
 
         // PROVISION
@@ -135,7 +138,7 @@ class InfraLifecycleIntegrationTest {
                 List.of());
 
         // COMPILE
-        var graph = compiler.compile(goals, GRAPH_FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, GRAPH_FACTORY)).graph();
         assertThat(graph.nodes()).hasSize(3);
         assertThat(graph.dependencies()).hasSize(2);
 
@@ -162,7 +165,7 @@ class InfraLifecycleIntegrationTest {
                 List.of(new ResourceDeclaration("ns1", "k8s_namespace", null,
                         nsConfig("drift-ns"), List.of())),
                 List.of());
-        var graph = compiler.compile(goals, GRAPH_FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, GRAPH_FACTORY)).graph();
         var node = graph.nodes().values().iterator().next();
         nodeProvisioner.provision(node, new ProvisionContext("tenant-1", graph));
 
@@ -187,7 +190,7 @@ class InfraLifecycleIntegrationTest {
                 FaultType.PROVISION_FAILED,
                 "unsupported resource type");
 
-        var mutations = faultPolicy.onFault(faultEvent, GRAPH_FACTORY.empty());
+        var mutations = faultPolicy.onFault(faultEvent, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(mutations).isEmpty();
     }
@@ -210,7 +213,7 @@ class InfraLifecycleIntegrationTest {
                 List.of());
 
         // COMPILE
-        var graph = compiler.compile(goals, GRAPH_FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, GRAPH_FACTORY)).graph();
         assertThat(graph.nodes()).hasSize(4);
 
         // PROVISION all
@@ -237,7 +240,7 @@ class InfraLifecycleIntegrationTest {
                 List.of(new ResourceDeclaration("ns1", "k8s_namespace", null,
                         nsConfig("ghost-ns"), List.of())),
                 List.of());
-        var graph = compiler.compile(goals, GRAPH_FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, GRAPH_FACTORY)).graph();
 
         // READ STATE without provisioning -> UNKNOWN (via ResourceStatus.UNKNOWN mapping)
         var actualState = stateAdapter.readActual(graph, "tenant-1");

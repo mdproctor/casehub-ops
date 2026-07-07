@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
@@ -91,7 +92,7 @@ class InfraGoalCompilerTest {
                         nsConfig("production"), List.of())),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("ns1"));
@@ -115,7 +116,7 @@ class InfraGoalCompilerTest {
                         nsConfig("staging"), List.of())),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         InfraDesiredNodeSpec wrapper = (InfraDesiredNodeSpec) graph.nodes().get(NodeId.of("ns1")).spec();
         assertThat(wrapper.backendId()).isEqualTo("terraform");
@@ -132,7 +133,7 @@ class InfraGoalCompilerTest {
                                 nsConfig("staging"), List.of("ns1"))),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.dependencies()).hasSize(1);
         Dependency dep = graph.dependencies().iterator().next();
@@ -153,7 +154,7 @@ class InfraGoalCompilerTest {
                         config, List.of())),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         InfraDesiredNodeSpec wrapper = (InfraDesiredNodeSpec) graph.nodes().get(NodeId.of("w1")).spec();
         assertThat(wrapper.resourceSpec()).isInstanceOf(GenericResourceSpec.class);
@@ -194,7 +195,7 @@ class InfraGoalCompilerTest {
                         nsConfig("default"), List.of())),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         InfraDesiredNodeSpec wrapper = (InfraDesiredNodeSpec) graph.nodes().get(NodeId.of("ns1")).spec();
         assertThat(wrapper.backendId()).isEqualTo("standalone");
@@ -211,7 +212,7 @@ class InfraGoalCompilerTest {
                         config, List.of())),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         InfraDesiredNodeSpec wrapper = (InfraDesiredNodeSpec) graph.nodes().get(NodeId.of("d1")).spec();
         K8sDeploymentSpec deploy = (K8sDeploymentSpec) wrapper.resourceSpec();
@@ -243,7 +244,7 @@ class InfraGoalCompilerTest {
                                 List.of("d1"))),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(3);
         assertThat(graph.dependencies()).hasSize(2);

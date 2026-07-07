@@ -1,5 +1,7 @@
 package io.casehub.ops.iot;
 
+import io.casehub.desiredstate.api.CompilationResult;
+import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.desiredstate.api.ProvisionContext;
@@ -84,7 +86,7 @@ class IoTReconciliationIntegrationTest {
         var provisioner = new IoTNodeProvisioner(registry, List.of(provider), approvalEvaluator, planStore);
         var planner = new TransitionPlanner();
 
-        var graph = compiler.compile(goals, FACTORY);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, FACTORY)).graph();
         var actual = adapter.readActual(graph, "tenant-1");
 
         assertThat(actual.statusOf(NodeId.of("thermo-1"))).contains(NodeStatus.ABSENT);

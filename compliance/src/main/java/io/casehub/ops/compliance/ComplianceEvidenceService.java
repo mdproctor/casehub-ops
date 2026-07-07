@@ -2,7 +2,7 @@ package io.casehub.ops.compliance;
 
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.ledger.api.model.LedgerEntryType;
-import io.casehub.ledger.runtime.repository.LedgerEntryRepository;
+import io.casehub.ledger.api.spi.LedgerEntryRepository;
 import io.casehub.ops.api.compliance.*;
 import io.casehub.platform.api.identity.ActorType;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,7 +34,6 @@ public class ComplianceEvidenceService {
     private final LedgerWriter ledgerWriter;
     private final LatestEvidenceFinder latestEvidenceFinder;
 
-    // CDI constructor
     @Inject
     public ComplianceEvidenceService(
             Instance<EvidenceCollector> collectorInstances,
@@ -42,7 +41,7 @@ public class ComplianceEvidenceService {
             EntityManager entityManager) {
         this.collectors = new HashMap<>();
         StreamSupport.stream(collectorInstances.spliterator(), false)
-                .forEach(c -> collectors.put(c.controlType(), c));
+                .forEach(c -> collectors.put(c.strategy(), c));
         this.ledgerWriter = (entry, tenancyId) -> {
             entry.tenancyId = tenancyId;
             ledgerRepository.save(entry, tenancyId);
@@ -55,26 +54,30 @@ public class ComplianceEvidenceService {
                         .getResultList();
     }
 
-    // Test constructor
     public ComplianceEvidenceService(
             List<EvidenceCollector> collectorList,
             LedgerWriter ledgerWriter,
             LatestEvidenceFinder latestEvidenceFinder) {
         this.collectors = new HashMap<>();
-        collectorList.forEach(c -> collectors.put(c.controlType(), c));
+        collectorList.forEach(c -> collectors.put(c.strategy(), c));
         this.ledgerWriter = ledgerWriter;
         this.latestEvidenceFinder = latestEvidenceFinder;
     }
 
     public EvidenceOutcome collectAndRecord(ComplianceControlSpec spec, String tenancyId) {
-        EvidenceCollector collector = collectors.get(spec.controlType());
+        EvidenceCollector collector = collectors.get(spec.strategy());
         if (collector == null) {
             throw new IllegalArgumentException(
-                    "No EvidenceCollector registered for controlType: " + spec.controlType());
+                    "No EvidenceCollector registered for strategy: " + spec.strategy());
         }
 
-        EvidenceResult result = collector.collect(spec, tenancyId);
-        ComplianceLedgerEntry entry = createLedgerEntry(spec.controlId(), spec.controlType(), result);
+        EvidenceResult result;
+        try {
+            result = collector.collect(spec, tenancyId);
+        } catch (Exception e) {
+            result = new EvidenceResult.Unavailable("collector error: " + e.getMessage());
+        }
+        ComplianceLedgerEntry entry = createLedgerEntry(spec, result);
 
         ledgerWriter.save(entry, tenancyId);
 
@@ -121,19 +124,19 @@ public class ComplianceEvidenceService {
         );
     }
 
-    private ComplianceLedgerEntry createLedgerEntry(String controlId, String controlType, EvidenceResult result) {
+    private ComplianceLedgerEntry createLedgerEntry(ComplianceControlSpec spec, EvidenceResult result) {
         ComplianceLedgerEntry entry = new ComplianceLedgerEntry();
-        entry.subjectId = deriveDeterministicSubjectId(controlId);
+        entry.subjectId = deriveDeterministicSubjectId(spec.controlId());
         entry.entryType = LedgerEntryType.EVENT;
         entry.actorType = ActorType.SYSTEM;
         entry.actorId = "system:compliance-evidence";
         entry.actorRole = "EvidenceCollector";
         entry.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-        entry.controlId = controlId;
-        entry.controlType = controlType;
+        entry.controlId = spec.controlId();
+        entry.controlType = spec.controlType();
         entry.outcome = mapToOutcome(result);
         entry.detail = result.detail();
-        entry.collectorId = "system:" + controlType.toLowerCase().replace('_', '-');
+        entry.collectorId = "system:" + spec.strategy().toLowerCase().replace('_', '-');
         return entry;
     }
 

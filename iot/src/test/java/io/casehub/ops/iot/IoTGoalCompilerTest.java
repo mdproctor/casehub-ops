@@ -1,5 +1,6 @@
 package io.casehub.ops.iot;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
@@ -36,7 +37,7 @@ class IoTGoalCompilerTest {
                 Map.of("targetTemperature", Map.of("value", 22, "unit", "CELSIUS")),
                 List.of())));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(2);
         assertThat(graph.nodes().get(NodeId.of("thermo-1")).requiresHuman()).isTrue();
@@ -52,7 +53,7 @@ class IoTGoalCompilerTest {
             new IoTDeviceGoal("light-1", DeviceClass.LIGHT, "Porch", false,
                 Map.of("isOn", true), List.of())));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("light-1"));
@@ -69,7 +70,7 @@ class IoTGoalCompilerTest {
             new IoTDeviceGoal("sensor", DeviceClass.SENSOR, "Hallway", true,
                 Map.of(), List.of("hub"))));
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.dependencies()).contains(
             new Dependency(NodeId.of("sensor"), NodeId.of("hub")));
@@ -78,7 +79,7 @@ class IoTGoalCompilerTest {
     @Test
     void emptyDeviceList_emptyGraph() {
         var goals = new IoTGoals("tenant-1", List.of());
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
         assertThat(graph.isEmpty()).isTrue();
     }
 

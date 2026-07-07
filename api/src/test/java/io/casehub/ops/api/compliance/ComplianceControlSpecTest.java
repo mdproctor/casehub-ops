@@ -12,12 +12,13 @@ class ComplianceControlSpecTest {
     @Test
     void validSpecConstructs() {
         var spec = new ComplianceControlSpec(
-                "encryption-at-rest", "ENCRYPTION_AT_REST",
+                "encryption-at-rest", "ENCRYPTION_AT_REST", "FILE_EXISTENCE",
                 "Encryption at Rest", "AES-256 required",
                 List.of(new FrameworkMapping("SOC2", "CC6.1")),
                 30, false, Map.of("cipher", "AES-256"));
         assertThat(spec.controlId()).isEqualTo("encryption-at-rest");
         assertThat(spec.controlType()).isEqualTo("ENCRYPTION_AT_REST");
+        assertThat(spec.strategy()).isEqualTo("FILE_EXISTENCE");
         assertThat(spec.evidenceMaxAgeDays()).isEqualTo(30);
         assertThat(spec.frameworks()).hasSize(1);
         assertThat(spec.properties()).containsEntry("cipher", "AES-256");
@@ -26,7 +27,7 @@ class ComplianceControlSpecTest {
     @Test
     void nullControlIdThrows() {
         assertThatThrownBy(() -> new ComplianceControlSpec(
-                null, "TYPE", "T", "D", List.of(), 30, false, Map.of()))
+                null, "TYPE", "STRATEGY", "T", "D", List.of(), 30, false, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("controlId");
     }
@@ -34,15 +35,31 @@ class ComplianceControlSpecTest {
     @Test
     void blankControlTypeThrows() {
         assertThatThrownBy(() -> new ComplianceControlSpec(
-                "id", "  ", "T", "D", List.of(), 30, false, Map.of()))
+                "id", "  ", "STRATEGY", "T", "D", List.of(), 30, false, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("controlType");
     }
 
     @Test
+    void nullStrategyThrows() {
+        assertThatThrownBy(() -> new ComplianceControlSpec(
+                "id", "TYPE", null, "T", "D", List.of(), 30, false, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("strategy");
+    }
+
+    @Test
+    void blankStrategyThrows() {
+        assertThatThrownBy(() -> new ComplianceControlSpec(
+                "id", "TYPE", "  ", "T", "D", List.of(), 30, false, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("strategy");
+    }
+
+    @Test
     void zeroEvidenceMaxAgeDaysThrows() {
         assertThatThrownBy(() -> new ComplianceControlSpec(
-                "id", "TYPE", "T", "D", List.of(), 0, false, Map.of()))
+                "id", "TYPE", "STRATEGY", "T", "D", List.of(), 0, false, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("evidenceMaxAgeDays");
     }
@@ -52,14 +69,14 @@ class ComplianceControlSpecTest {
         var props = new LinkedHashMap<String, Object>();
         props.put("key", null);
         var spec = new ComplianceControlSpec(
-                "id", "TYPE", "T", "D", List.of(), 30, false, props);
+                "id", "TYPE", "STRATEGY", "T", "D", List.of(), 30, false, props);
         assertThat(spec.properties()).containsEntry("key", null);
     }
 
     @Test
     void propertiesAreImmutable() {
         var spec = new ComplianceControlSpec(
-                "id", "TYPE", "T", "D", List.of(), 30, false, Map.of("k", "v"));
+                "id", "TYPE", "STRATEGY", "T", "D", List.of(), 30, false, Map.of("k", "v"));
         assertThatThrownBy(() -> spec.properties().put("x", "y"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -67,7 +84,7 @@ class ComplianceControlSpecTest {
     @Test
     void frameworksAreImmutable() {
         var spec = new ComplianceControlSpec(
-                "id", "TYPE", "T", "D",
+                "id", "TYPE", "STRATEGY", "T", "D",
                 new java.util.ArrayList<>(List.of(new FrameworkMapping("SOC2", "CC6.1"))),
                 30, false, Map.of());
         assertThatThrownBy(() -> spec.frameworks().add(new FrameworkMapping("GDPR", "Art.32")))
@@ -77,7 +94,7 @@ class ComplianceControlSpecTest {
     @Test
     void nullFrameworksDefaultsToEmptyList() {
         var spec = new ComplianceControlSpec(
-                "id", "TYPE", "T", "D", null, 30, false, null);
+                "id", "TYPE", "STRATEGY", "T", "D", null, 30, false, null);
         assertThat(spec.frameworks()).isEmpty();
         assertThat(spec.properties()).isEmpty();
     }
@@ -103,7 +120,7 @@ class ComplianceControlSpecTest {
     @Test
     void goalEntryDefaultsDependsOnToEmpty() {
         var spec = new ComplianceControlSpec(
-                "id", "TYPE", "T", "D", List.of(), 30, false, Map.of());
+                "id", "TYPE", "STRATEGY", "T", "D", List.of(), 30, false, Map.of());
         var entry = new ComplianceGoalEntry(spec, null);
         assertThat(entry.dependsOn()).isEmpty();
     }
@@ -117,7 +134,7 @@ class ComplianceControlSpecTest {
     @Test
     void requiresHuman_delegatesToRequiresHumanReview_true() {
         var spec = new ComplianceControlSpec(
-            "access-review", "ACCESS_REVIEW", "Access Review", "Quarterly",
+            "access-review", "ACCESS_REVIEW", "FILE_EXISTENCE", "Access Review", "Quarterly",
             List.of(), 90, true, Map.of());
         assertThat(spec.requiresHuman()).isTrue();
     }
@@ -125,7 +142,7 @@ class ComplianceControlSpecTest {
     @Test
     void requiresHuman_delegatesToRequiresHumanReview_false() {
         var spec = new ComplianceControlSpec(
-            "encryption", "ENCRYPTION_AT_REST", "Encryption", "AES-256",
+            "encryption", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Encryption", "AES-256",
             List.of(), 30, false, Map.of());
         assertThat(spec.requiresHuman()).isFalse();
     }

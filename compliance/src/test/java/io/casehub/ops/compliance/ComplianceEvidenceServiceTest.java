@@ -25,7 +25,7 @@ class ComplianceEvidenceServiceTest {
     void setUp() {
         ledgerRepo = new StubLedgerRepository();
         collector = new StubEvidenceCollector(
-                "LOG_RETENTION",
+                "LOG_DIRECTORY",
                 new EvidenceResult.Pass("default pass"));
         service = new ComplianceEvidenceService(
                 List.of(collector),
@@ -37,15 +37,10 @@ class ComplianceEvidenceServiceTest {
     void collectAndRecord_withPassOutcome_writesLedgerEntryWithCorrectBaseFields() {
         collector.nextResult = new EvidenceResult.Pass("retention policy present");
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-001",
-                "LOG_RETENTION",
+                "ctrl-001", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         EvidenceOutcome outcome = service.collectAndRecord(spec, "tenant-1");
 
@@ -61,6 +56,7 @@ class ComplianceEvidenceServiceTest {
         assertThat(ledgerRepo.saved.controlType).isEqualTo("LOG_RETENTION");
         assertThat(ledgerRepo.saved.outcome).isEqualTo(EvidenceOutcome.PASS);
         assertThat(ledgerRepo.saved.detail).isEqualTo("retention policy present");
+        assertThat(ledgerRepo.saved.collectorId).isEqualTo("system:log-directory");
         assertThat(ledgerRepo.saved.tenancyId).isEqualTo("tenant-1");
     }
 
@@ -68,15 +64,10 @@ class ComplianceEvidenceServiceTest {
     void collectAndRecord_withFailOutcome_mapsCorrectly() {
         collector.nextResult = new EvidenceResult.Fail("retention policy missing");
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-002",
-                "LOG_RETENTION",
+                "ctrl-002", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         EvidenceOutcome outcome = service.collectAndRecord(spec, "tenant-1");
 
@@ -89,15 +80,10 @@ class ComplianceEvidenceServiceTest {
     void collectAndRecord_withUnavailableOutcome_mapsCorrectly() {
         collector.nextResult = new EvidenceResult.Unavailable("audit system offline");
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-003",
-                "LOG_RETENTION",
+                "ctrl-003", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         EvidenceOutcome outcome = service.collectAndRecord(spec, "tenant-1");
 
@@ -107,18 +93,33 @@ class ComplianceEvidenceServiceTest {
     }
 
     @Test
+    void collectAndRecord_whenCollectorThrows_recordsUnavailable() {
+        var throwingCollector = new EvidenceCollector() {
+            @Override public String strategy() { return "EXPLODING"; }
+            @Override public EvidenceResult collect(ComplianceControlSpec spec, String tenancyId) {
+                throw new RuntimeException("disk on fire");
+            }
+        };
+        service = new ComplianceEvidenceService(
+                List.of(throwingCollector), ledgerRepo::save, ledgerRepo::findLatest);
+        ComplianceControlSpec spec = new ComplianceControlSpec(
+                "ctrl-explode", "LOG_RETENTION", "EXPLODING",
+                "T", "D", List.of(), 30, false, null);
+
+        EvidenceOutcome outcome = service.collectAndRecord(spec, "tenant-1");
+
+        assertThat(outcome).isEqualTo(EvidenceOutcome.UNAVAILABLE);
+        assertThat(ledgerRepo.saved.detail).isEqualTo("collector error: disk on fire");
+    }
+
+    @Test
     void evidenceStatus_whenNoEvidence_returnsAbsent() {
         ledgerRepo.latestEntry = null;
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-004",
-                "LOG_RETENTION",
+                "ctrl-004", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         ControlEvidenceStatus status = service.evidenceStatus(spec, "tenant-1");
 
@@ -138,15 +139,10 @@ class ComplianceEvidenceServiceTest {
         ledgerRepo.latestEntry = entry;
 
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-005",
-                "LOG_RETENTION",
+                "ctrl-005", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         ControlEvidenceStatus status = service.evidenceStatus(spec, "tenant-1");
 
@@ -165,15 +161,10 @@ class ComplianceEvidenceServiceTest {
         ledgerRepo.latestEntry = entry;
 
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-006",
-                "LOG_RETENTION",
+                "ctrl-006", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         ControlEvidenceStatus status = service.evidenceStatus(spec, "tenant-1");
 
@@ -191,15 +182,10 @@ class ComplianceEvidenceServiceTest {
         ledgerRepo.latestEntry = entry;
 
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-007",
-                "LOG_RETENTION",
+                "ctrl-007", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30,
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         ControlEvidenceStatus status = service.evidenceStatus(spec, "tenant-1");
 
@@ -213,20 +199,14 @@ class ComplianceEvidenceServiceTest {
     void evidenceStatus_whenStale_returnsDriftedStale() {
         ComplianceLedgerEntry entry = new ComplianceLedgerEntry();
         entry.outcome = EvidenceOutcome.PASS;
-        // 60 days old
         entry.occurredAt = Instant.now().minus(60, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
         ledgerRepo.latestEntry = entry;
 
         ComplianceControlSpec spec = new ComplianceControlSpec(
-                "ctrl-008",
-                "LOG_RETENTION",
+                "ctrl-008", "LOG_RETENTION", "LOG_DIRECTORY",
                 "Log Retention Policy",
                 "Ensure all logs are retained for the required period",
-                List.of(),
-                30, // max age 30 days
-                false,
-                null
-        );
+                List.of(), 30, false, null);
 
         ControlEvidenceStatus status = service.evidenceStatus(spec, "tenant-1");
 
@@ -238,17 +218,17 @@ class ComplianceEvidenceServiceTest {
 
     // Stub implementations for testing
     static class StubEvidenceCollector implements EvidenceCollector {
-        private final String type;
+        private final String strategyName;
         EvidenceResult nextResult;
 
-        StubEvidenceCollector(String type, EvidenceResult defaultResult) {
-            this.type = type;
+        StubEvidenceCollector(String strategyName, EvidenceResult defaultResult) {
+            this.strategyName = strategyName;
             this.nextResult = defaultResult;
         }
 
         @Override
-        public String controlType() {
-            return type;
+        public String strategy() {
+            return strategyName;
         }
 
         @Override

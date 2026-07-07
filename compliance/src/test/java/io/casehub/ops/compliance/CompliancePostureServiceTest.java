@@ -159,7 +159,7 @@ class CompliancePostureServiceTest {
     }
 
     private ComplianceControlSpec minimalSpec(String id, String type, List<FrameworkMapping> frameworks) {
-        return new ComplianceControlSpec(id, type, "T", "D", frameworks, 30, false, Map.of());
+        return new ComplianceControlSpec(id, type, "FILE_EXISTENCE", "T", "D", frameworks, 30, false, Map.of());
     }
 
     // Stub that maintains a map of controlId -> entry

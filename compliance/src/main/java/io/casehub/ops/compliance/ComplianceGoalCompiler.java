@@ -10,7 +10,7 @@ import java.util.List;
 public class ComplianceGoalCompiler implements GoalCompiler<ComplianceGoals> {
 
     @Override
-    public DesiredStateGraph compile(ComplianceGoals goals, DesiredStateGraphFactory factory) {
+    public CompilationResult compile(ComplianceGoals goals, DesiredStateGraphFactory factory) {
         List<DesiredNode> nodes = new ArrayList<>();
         List<Dependency> deps = new ArrayList<>();
 
@@ -26,6 +26,6 @@ public class ComplianceGoalCompiler implements GoalCompiler<ComplianceGoals> {
                 deps.add(new Dependency(NodeId.of(spec.controlId()), NodeId.of(depId)));
             }
         }
-        return factory.of(nodes, deps);
+        return CompilationResult.single(factory.of(nodes, deps));
     }
 }

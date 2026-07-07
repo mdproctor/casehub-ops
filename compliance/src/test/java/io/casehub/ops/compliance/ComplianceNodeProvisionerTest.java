@@ -22,7 +22,7 @@ class ComplianceNodeProvisionerTest {
     @BeforeEach
     void setUp() {
         var collector = new ComplianceEvidenceServiceTest.StubEvidenceCollector(
-                "ENCRYPTION_AT_REST", new EvidenceResult.Pass("ok"));
+                "FILE_EXISTENCE", new EvidenceResult.Pass("ok"));
         ledgerRepo = new ComplianceEvidenceServiceTest.StubLedgerRepository();
         var evidenceService = new ComplianceEvidenceService(
                 List.of(collector),
@@ -40,7 +40,7 @@ class ComplianceNodeProvisionerTest {
     @Test
     void provisionCollectsEvidenceAndRegistersControl() {
         var spec = new ComplianceControlSpec(
-                "enc", "ENCRYPTION_AT_REST", "Enc", "D",
+                "enc", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Enc", "D",
                 List.of(new FrameworkMapping("SOC2", "CC6.1")),
                 30, false, Map.of());
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
@@ -57,7 +57,7 @@ class ComplianceNodeProvisionerTest {
     @Test
     void provisionFailReturnsSuccessButRecordsFail() {
         var failCollector = new ComplianceEvidenceServiceTest.StubEvidenceCollector(
-                "ENCRYPTION_AT_REST", new EvidenceResult.Fail("not encrypted"));
+                "FILE_EXISTENCE", new EvidenceResult.Fail("not encrypted"));
         var evidenceService = new ComplianceEvidenceService(
                 List.of(failCollector),
                 ledgerRepo::save,
@@ -68,7 +68,7 @@ class ComplianceNodeProvisionerTest {
                 approvalEvaluator, planStore);
 
         var spec = new ComplianceControlSpec(
-                "enc", "ENCRYPTION_AT_REST", "Enc", "D", List.of(), 30, false, Map.of());
+                "enc", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Enc", "D", List.of(), 30, false, Map.of());
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
 
         ProvisionResult result = provisioner.provision(node, new ProvisionContext("default", graphFactory.empty()));
@@ -80,7 +80,7 @@ class ComplianceNodeProvisionerTest {
     @Test
     void deprovisionRemovesRegistrationAndHash() {
         var spec = new ComplianceControlSpec(
-                "enc", "ENCRYPTION_AT_REST", "Enc", "D",
+                "enc", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Enc", "D",
                 List.of(new FrameworkMapping("SOC2", "CC6.1")),
                 30, false, Map.of());
         var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);

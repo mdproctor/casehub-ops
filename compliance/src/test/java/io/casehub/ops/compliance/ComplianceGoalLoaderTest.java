@@ -27,17 +27,17 @@ class ComplianceGoalLoaderTest {
     }
 
     @Test
-    void loadsAllSixControls() {
+    void loadsAllControls() {
         var goals = loader.load("test-compliance/all-controls.yaml");
-        assertThat(goals.controls()).hasSize(6);
+        assertThat(goals.controls()).hasSize(8);
     }
 
     @Test
     void loadsDirectoryAndMerges(@TempDir Path tempDir) throws IOException {
         Files.writeString(tempDir.resolve("encryption.yaml"),
-                "controls:\n  - spec:\n      controlId: enc\n      controlType: ENCRYPTION_AT_REST\n      title: Enc\n      description: D\n      evidenceMaxAgeDays: 30\n      requiresHumanReview: false\n");
+                "controls:\n  - spec:\n      controlId: enc\n      controlType: ENCRYPTION_AT_REST\n      strategy: FILE_EXISTENCE\n      title: Enc\n      description: D\n      evidenceMaxAgeDays: 30\n      requiresHumanReview: false\n");
         Files.writeString(tempDir.resolve("logging.yaml"),
-                "controls:\n  - spec:\n      controlId: log\n      controlType: LOG_RETENTION\n      title: Log\n      description: D\n      evidenceMaxAgeDays: 90\n      requiresHumanReview: false\n");
+                "controls:\n  - spec:\n      controlId: log\n      controlType: LOG_RETENTION\n      strategy: LOG_DIRECTORY\n      title: Log\n      description: D\n      evidenceMaxAgeDays: 90\n      requiresHumanReview: false\n");
 
         var goals = loader.loadDirectory(tempDir.toString());
         assertThat(goals.controls()).hasSize(2);

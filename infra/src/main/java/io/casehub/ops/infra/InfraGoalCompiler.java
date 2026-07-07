@@ -10,9 +10,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
-import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.GoalCompiler;
 import io.casehub.desiredstate.api.NodeId;
@@ -64,7 +64,7 @@ public class InfraGoalCompiler implements GoalCompiler<InfraGoals> {
     private static final String STANDALONE_BACKEND = "standalone";
 
     @Override
-    public DesiredStateGraph compile(InfraGoals goals, DesiredStateGraphFactory factory) {
+    public CompilationResult compile(InfraGoals goals, DesiredStateGraphFactory factory) {
         List<DesiredNode> nodes = new ArrayList<>();
         List<Dependency> dependencies = new ArrayList<>();
 
@@ -94,7 +94,7 @@ public class InfraGoalCompiler implements GoalCompiler<InfraGoals> {
             }
         }
 
-        return factory.of(nodes, dependencies);
+        return CompilationResult.single(factory.of(nodes, dependencies));
     }
 
     private String resolveBackend(String perResource, String defaultBackend) {

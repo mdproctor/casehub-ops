@@ -1,6 +1,6 @@
 package io.casehub.ops.compliance;
 
-import io.casehub.ledger.runtime.model.LedgerEntry;
+import io.casehub.ledger.api.model.LedgerEntry;
 import io.casehub.ops.api.compliance.EvidenceOutcome;
 import jakarta.persistence.*;
 import java.nio.charset.StandardCharsets;
