@@ -151,4 +151,31 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>skip-quarkus-tests</id>
+            <activation>
+                <property>
+                    <name>!runQuarkusTests</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/entity/*Test.java</exclude>
+                                <exclude>**/rest/*Test.java</exclude>
+                                <exclude>**/service/ApplicationLifecycleService*Test.java</exclude>
+                                <exclude>**/service/ClusterServiceTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
