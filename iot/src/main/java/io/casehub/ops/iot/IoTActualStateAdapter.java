@@ -28,7 +28,6 @@ public class IoTActualStateAdapter implements ActualStateAdapter {
         this.registry = registry;
     }
 
-    @Override
     public Set<NodeType> handledTypes() {
         return Set.of(NodeType.of("physical-device"), NodeType.of("device-config"));
     }

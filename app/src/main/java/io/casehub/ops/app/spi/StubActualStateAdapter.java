@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class StubActualStateAdapter implements ActualStateAdapter {
 
-    @Override
     public Set<NodeType> handledTypes() {
         return Set.of();
     }

@@ -22,7 +22,6 @@ public class ComplianceActualStateAdapter implements ActualStateAdapter {
         this.specHashStore = specHashStore;
     }
 
-    @Override
     public Set<NodeType> handledTypes() {
         return ComplianceNodeProvisioner.HANDLED_TYPES;
     }

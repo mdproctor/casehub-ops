@@ -36,7 +36,6 @@ public class DeploymentActualStateAdapter implements ActualStateAdapter {
         this.specHashStore = specHashStore;
     }
 
-    @Override
     public Set<NodeType> handledTypes() {
         return Set.of(
                 NodeType.of("agent"),

@@ -30,7 +30,6 @@ public class KubernetesActualStateAdapter implements ActualStateAdapter {
         this.clientRegistry = clientRegistry;
     }
 
-    @Override
     public Set<NodeType> handledTypes() {
         return Set.of(
                 ApplicationNodeTypes.K8S_NAMESPACE,

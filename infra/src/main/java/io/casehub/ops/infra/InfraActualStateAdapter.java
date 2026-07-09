@@ -49,7 +49,6 @@ public class InfraActualStateAdapter implements ActualStateAdapter {
                 .collect(Collectors.toMap(InfraBackend::backendId, b -> b));
     }
 
-    @Override
     public Set<NodeType> handledTypes() {
         return Set.of(
                 NodeType.of("k8s_namespace"),
