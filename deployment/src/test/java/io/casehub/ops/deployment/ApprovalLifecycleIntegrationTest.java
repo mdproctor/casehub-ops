@@ -204,8 +204,10 @@ class ApprovalLifecycleIntegrationTest {
         }
 
         @Override
-        public List<AgentDescriptor> find(AgentQuery query) {
-            return new ArrayList<>(descriptors.values());
+        public List<io.casehub.eidos.api.AgentMatch> find(AgentQuery query) {
+            return descriptors.values().stream()
+                    .map(d -> new io.casehub.eidos.api.AgentMatch(d, null))
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 
@@ -219,37 +221,37 @@ class ApprovalLifecycleIntegrationTest {
 
         @Override
         public Channel create(ChannelCreateRequest req) {
-            Channel ch = new Channel();
-            ch.id = UUID.randomUUID();
-            ch.name = req.name();
-            ch.semantic = req.semantic();
-            channels.put(ch.name, ch);
+            Channel ch = Channel.builder(req.name())
+                    .id(UUID.randomUUID())
+                    .semantic(req.semantic())
+                    .build();
+            channels.put(ch.name(), ch);
             return ch;
         }
 
         @Override
         public void delete(UUID channelId, boolean force) {
-            channels.values().removeIf(ch -> ch.id.equals(channelId));
+            channels.values().removeIf(ch -> ch.id().equals(channelId));
         }
 
         @Override
         public Channel setTypeConstraints(UUID channelId, Set<MessageType> allowed, Set<MessageType> denied) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
         public Channel setRateLimits(UUID channelId, Integer perChannel, Integer perInstance) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
-        public Channel setAllowedWriters(UUID channelId, String allowedWriters) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+        public Channel setAllowedWriters(UUID channelId, List<String> allowedWriters) {
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
-        public Channel setAdminInstances(UUID channelId, String adminInstances) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+        public Channel setAdminInstances(UUID channelId, List<String> adminInstances) {
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
     }
 

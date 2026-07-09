@@ -1,5 +1,6 @@
 package io.casehub.ops.deployment.handler;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -59,15 +60,15 @@ class ChannelProvisionHandlerTest {
 
         assertThat(result).isInstanceOf(ProvisionResult.Success.class);
         Channel created = stub.findByName("alerts").orElseThrow();
-        assertThat(created.name).isEqualTo("alerts");
-        assertThat(created.description).isEqualTo("Alert notifications");
-        assertThat(created.semantic).isEqualTo(ChannelSemantic.APPEND);
-        assertThat(created.allowedWriters).isEqualTo("agent:monitor");
-        assertThat(created.adminInstances).isEqualTo("agent:admin");
-        assertThat(created.rateLimitPerChannel).isEqualTo(100);
-        assertThat(created.rateLimitPerInstance).isEqualTo(10);
-        assertThat(MessageType.parseTypes(created.allowedTypes)).isEqualTo(Set.of(MessageType.COMMAND, MessageType.EVENT));
-        assertThat(MessageType.parseTypes(created.deniedTypes)).isEqualTo(Set.of(MessageType.STATUS));
+        assertThat(created.name()).isEqualTo("alerts");
+        assertThat(created.description()).isEqualTo("Alert notifications");
+        assertThat(created.semantic()).isEqualTo(ChannelSemantic.APPEND);
+        assertThat(created.allowedWriters()).isEqualTo(List.of("agent:monitor"));
+        assertThat(created.adminInstances()).isEqualTo(List.of("agent:admin"));
+        assertThat(created.rateLimitPerChannel()).isEqualTo(100);
+        assertThat(created.rateLimitPerInstance()).isEqualTo(10);
+        assertThat(created.allowedTypes()).isEqualTo(Set.of(MessageType.COMMAND, MessageType.EVENT));
+        assertThat(created.deniedTypes()).isEqualTo(Set.of(MessageType.STATUS));
     }
 
     @Test
@@ -88,7 +89,7 @@ class ChannelProvisionHandlerTest {
         );
         handler.provision(initialSpec, new ProvisionContext("test-tenancy", emptyGraph));
         Channel initial = stub.findByName("events").orElseThrow();
-        UUID initialId = initial.id;
+        UUID initialId = initial.id();
 
         // Update with new mutable values
         var updatedSpec = new ChannelNodeSpec(
@@ -109,15 +110,15 @@ class ChannelProvisionHandlerTest {
 
         assertThat(result).isInstanceOf(ProvisionResult.Success.class);
         Channel updated = stub.findByName("events").orElseThrow();
-        assertThat(updated.id).isEqualTo(initialId); // Same channel
-        assertThat(updated.description).isEqualTo("Event stream"); // Immutable, unchanged
-        assertThat(updated.semantic).isEqualTo(ChannelSemantic.COLLECT); // Immutable, unchanged
-        assertThat(updated.allowedWriters).isEqualTo("agent:new-writer");
-        assertThat(updated.adminInstances).isEqualTo("agent:new-admin");
-        assertThat(updated.rateLimitPerChannel).isEqualTo(200);
-        assertThat(updated.rateLimitPerInstance).isEqualTo(20);
-        assertThat(MessageType.parseTypes(updated.allowedTypes)).isEqualTo(Set.of(MessageType.EVENT, MessageType.QUERY));
-        assertThat(MessageType.parseTypes(updated.deniedTypes)).isEqualTo(Set.of(MessageType.STATUS));
+        assertThat(updated.id()).isEqualTo(initialId); // Same channel
+        assertThat(updated.description()).isEqualTo("Event stream"); // Immutable, unchanged
+        assertThat(updated.semantic()).isEqualTo(ChannelSemantic.COLLECT); // Immutable, unchanged
+        assertThat(updated.allowedWriters()).isEqualTo(List.of("agent:new-writer"));
+        assertThat(updated.adminInstances()).isEqualTo(List.of("agent:new-admin"));
+        assertThat(updated.rateLimitPerChannel()).isEqualTo(200);
+        assertThat(updated.rateLimitPerInstance()).isEqualTo(20);
+        assertThat(updated.allowedTypes()).isEqualTo(Set.of(MessageType.EVENT, MessageType.QUERY));
+        assertThat(updated.deniedTypes()).isEqualTo(Set.of(MessageType.STATUS));
     }
 
     @Test
@@ -165,60 +166,62 @@ class ChannelProvisionHandlerTest {
 
         @Override
         public Channel create(ChannelCreateRequest req) {
-            Channel ch = new Channel();
-            ch.id = UUID.randomUUID();
-            ch.name = req.name();
-            ch.description = req.description();
-            ch.semantic = req.semantic();
-            ch.barrierContributors = req.barrierContributors();
-            ch.allowedWriters = req.allowedWriters();
-            ch.adminInstances = req.adminInstances();
-            ch.rateLimitPerChannel = req.rateLimitPerChannel();
-            ch.rateLimitPerInstance = req.rateLimitPerInstance();
-            ch.allowedTypes = MessageType.serializeTypes(req.allowedTypes());
-            ch.deniedTypes = MessageType.serializeTypes(req.deniedTypes());
-            channels.put(ch.name, ch);
+            Channel ch = Channel.builder(req.name())
+                    .id(UUID.randomUUID())
+                    .description(req.description())
+                    .semantic(req.semantic())
+                    .barrierContributors(req.barrierContributors())
+                    .allowedWriters(req.allowedWriters())
+                    .adminInstances(req.adminInstances())
+                    .rateLimitPerChannel(req.rateLimitPerChannel())
+                    .rateLimitPerInstance(req.rateLimitPerInstance())
+                    .allowedTypes(req.allowedTypes())
+                    .deniedTypes(req.deniedTypes())
+                    .build();
+            channels.put(ch.name(), ch);
             return ch;
         }
 
         @Override
         public void delete(UUID channelId, boolean force) {
-            channels.entrySet().removeIf(e -> e.getValue().id.equals(channelId));
+            channels.entrySet().removeIf(e -> e.getValue().id().equals(channelId));
         }
 
         @Override
         public Channel setTypeConstraints(UUID channelId, Set<MessageType> allowed, Set<MessageType> denied) {
             Channel ch = findById(channelId);
-            ch.allowedTypes = MessageType.serializeTypes(allowed);
-            ch.deniedTypes = MessageType.serializeTypes(denied);
-            return ch;
+            Channel updated = ch.toBuilder().allowedTypes(allowed).deniedTypes(denied).build();
+            channels.put(updated.name(), updated);
+            return updated;
         }
 
         @Override
         public Channel setRateLimits(UUID channelId, Integer perChannel, Integer perInstance) {
             Channel ch = findById(channelId);
-            ch.rateLimitPerChannel = perChannel;
-            ch.rateLimitPerInstance = perInstance;
-            return ch;
+            Channel updated = ch.toBuilder().rateLimitPerChannel(perChannel).rateLimitPerInstance(perInstance).build();
+            channels.put(updated.name(), updated);
+            return updated;
         }
 
         @Override
-        public Channel setAllowedWriters(UUID channelId, String allowedWriters) {
+        public Channel setAllowedWriters(UUID channelId, List<String> allowedWriters) {
             Channel ch = findById(channelId);
-            ch.allowedWriters = allowedWriters;
-            return ch;
+            Channel updated = ch.toBuilder().allowedWriters(allowedWriters).build();
+            channels.put(updated.name(), updated);
+            return updated;
         }
 
         @Override
-        public Channel setAdminInstances(UUID channelId, String adminInstances) {
+        public Channel setAdminInstances(UUID channelId, List<String> adminInstances) {
             Channel ch = findById(channelId);
-            ch.adminInstances = adminInstances;
-            return ch;
+            Channel updated = ch.toBuilder().adminInstances(adminInstances).build();
+            channels.put(updated.name(), updated);
+            return updated;
         }
 
         private Channel findById(UUID id) {
             return channels.values().stream()
-                    .filter(ch -> ch.id.equals(id))
+                    .filter(ch -> ch.id().equals(id))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + id));
         }

@@ -74,7 +74,7 @@ class AdaptiveTopologyIntegrationTest {
     @Test
     void baseCompilationProducesExpectedNodes() {
         DeploymentGoals goals = loader.load("test-deployment/adaptive-topology.yaml");
-        DesiredStateGraph base = compiler.compile(goals, graphFactory);
+        DesiredStateGraph base = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, graphFactory)).graph();
 
         // Base topology: triage-agent, risk-agent, trading/work channel, review trust policy
         assertThat(base.nodes()).hasSize(4);
@@ -189,7 +189,7 @@ class AdaptiveTopologyIntegrationTest {
         // Situation resolves
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;
@@ -222,7 +222,7 @@ class AdaptiveTopologyIntegrationTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.4, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;
@@ -249,7 +249,7 @@ class AdaptiveTopologyIntegrationTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.76, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         assertThat(reconciliationTarget.updateDesiredCalls).hasSize(1);
         var graph = reconciliationTarget.updateDesiredCalls.get(0).graph;

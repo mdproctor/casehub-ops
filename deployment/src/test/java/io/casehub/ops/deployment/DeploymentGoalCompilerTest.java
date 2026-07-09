@@ -43,7 +43,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("agent-1"));
@@ -65,7 +65,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("work-queue"));
@@ -93,7 +93,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("casehub:issue:1.0"));
@@ -121,7 +121,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(1);
         DesiredNode node = graph.nodes().get(NodeId.of("code-review"));
@@ -143,7 +143,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(2);
         assertThat(graph.dependencies()).hasSize(1);
@@ -182,7 +182,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).hasSize(4);
         assertThat(graph.dependencies()).hasSize(1);
@@ -205,7 +205,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         assertThat(graph.nodes()).isEmpty();
         assertThat(graph.dependencies()).isEmpty();
@@ -224,7 +224,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         DesiredNode node = graph.nodes().get(NodeId.of("io.casehub.devtown:pr-review:1.0"));
         assertThat(node).isNotNull();
@@ -248,7 +248,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         var resolved = (CaseTypeNodeSpec) graph.nodes()
                 .get(NodeId.of("io.casehub.devtown:pr-review:1.0")).spec();
@@ -268,7 +268,7 @@ class DeploymentGoalCompilerTest {
                 List.of(),
                 List.of());
 
-        DesiredStateGraph graph = compiler.compile(goals, factory);
+        DesiredStateGraph graph = ((io.casehub.desiredstate.api.CompilationResult.SingleGraph) compiler.compile(goals, factory)).graph();
 
         var resolved = (CaseTypeNodeSpec) graph.nodes()
                 .get(NodeId.of("casehub:issue:1.0")).spec();
@@ -280,7 +280,7 @@ class DeploymentGoalCompilerTest {
         return new AgentNodeSpec(id, "Test Agent", "worker",
                 "anthropic", "claude", "opus-4", "1.0", null,
                 null, null, null, null,
-                List.of(new AgentCapability("code-review", null, null, null, null, null, null, null, null, null)),
+                List.of(new AgentCapability("code-review", null, null, null, null, null, null, null, null, null, null)),
                 new AgentDisposition("collaborative", "strict", null, null, null, false),
                 null, null, null, List.of());
     }

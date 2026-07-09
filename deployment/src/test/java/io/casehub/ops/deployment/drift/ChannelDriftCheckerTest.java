@@ -70,10 +70,10 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelPresent_tenancyUsedInLookup() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:tenant-1", ch);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -87,18 +87,13 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelPresent() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.description = "desc";
-        ch.allowedTypes = MessageType.serializeTypes(Set.of(MessageType.COMMAND));
-        ch.deniedTypes = null;
-        ch.rateLimitPerChannel = null;
-        ch.rateLimitPerInstance = null;
-        ch.allowedWriters = null;
-        ch.adminInstances = null;
-        ch.barrierContributors = null;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .description("desc")
+                .allowedTypes(Set.of(MessageType.COMMAND))
+                .deniedTypes(Set.of())
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
@@ -117,15 +112,12 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_allowedTypesMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.description = "desc";
-        ch.allowedTypes = MessageType.serializeTypes(Set.of(MessageType.COMMAND));
-        ch.deniedTypes = null;
-        ch.rateLimitPerChannel = null;
-        ch.rateLimitPerInstance = null;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .description("desc")
+                .allowedTypes(Set.of(MessageType.COMMAND))
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
@@ -136,15 +128,12 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_rateLimitMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.description = "desc";
-        ch.allowedTypes = null;
-        ch.deniedTypes = null;
-        ch.rateLimitPerChannel = 100;
-        ch.rateLimitPerInstance = null;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .description("desc")
+                .rateLimitPerChannel(100)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
@@ -164,18 +153,17 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelPresent_allFieldsMatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.description = "Work channel";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.allowedTypes = MessageType.serializeTypes(Set.of(MessageType.COMMAND));
-        ch.deniedTypes = null;
-        ch.allowedWriters = "agent-1,agent-2";
-        ch.adminInstances = "admin-1";
-        ch.barrierContributors = "contrib-1,contrib-2";
-        ch.rateLimitPerChannel = 100;
-        ch.rateLimitPerInstance = 10;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .description("Work channel")
+                .semantic(ChannelSemantic.APPEND)
+                .allowedTypes(Set.of(MessageType.COMMAND))
+                .allowedWriters(List.of("agent-1", "agent-2"))
+                .adminInstances(List.of("admin-1"))
+                .barrierContributors(List.of("contrib-1", "contrib-2"))
+                .rateLimitPerChannel(100)
+                .rateLimitPerInstance(10)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", "Work channel", ChannelSemantic.APPEND,
@@ -187,11 +175,11 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_descriptionMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.description = "Old description";
-        ch.semantic = ChannelSemantic.APPEND;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .description("Old description")
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", "New description", ChannelSemantic.APPEND,
@@ -202,11 +190,11 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_allowedWritersOrderInsensitive() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.allowedWriters = "bob,alice";
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .allowedWriters(List.of("bob", "alice"))
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -217,11 +205,11 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_allowedWritersMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.allowedWriters = "alice,charlie";
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .allowedWriters(List.of("alice", "charlie"))
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -232,11 +220,11 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_adminInstancesMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.adminInstances = "admin-old";
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .adminInstances(List.of("admin-old"))
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -247,11 +235,11 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_barrierContributorsMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
-        ch.barrierContributors = "contrib-old";
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .barrierContributors(List.of("contrib-old"))
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -262,19 +250,16 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelPresent_withMatchingBinding() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        UUID channelId = UUID.randomUUID();
+        Channel ch = Channel.builder("dev/work")
+                .id(channelId)
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
-        ChannelConnectorBinding binding = new ChannelConnectorBinding();
-        binding.channelId = ch.id;
-        binding.inboundConnectorId = "slack";
-        binding.externalKey = "C12345";
-        binding.outboundConnectorId = "slack";
-        binding.outboundDestination = "#general";
-        bindings.put(ch.id, binding);
+        ChannelConnectorBinding binding = new ChannelConnectorBinding(
+                channelId, "slack", "C12345", "slack", "#general");
+        bindings.put(channelId, binding);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
                 null, null, null, null, null, null, null, "slack", "C12345", "slack", "#general");
@@ -284,19 +269,16 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_bindingFieldMismatch() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        UUID channelId = UUID.randomUUID();
+        Channel ch = Channel.builder("dev/work")
+                .id(channelId)
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
-        ChannelConnectorBinding binding = new ChannelConnectorBinding();
-        binding.channelId = ch.id;
-        binding.inboundConnectorId = "slack";
-        binding.externalKey = "C12345";
-        binding.outboundConnectorId = "slack";
-        binding.outboundDestination = "#old-channel";
-        bindings.put(ch.id, binding);
+        ChannelConnectorBinding binding = new ChannelConnectorBinding(
+                channelId, "slack", "C12345", "slack", "#old-channel");
+        bindings.put(channelId, binding);
 
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
                 null, null, null, null, null, null, null, "slack", "C12345", "slack", "#new-channel");
@@ -306,10 +288,10 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_bindingExpectedButAbsent() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
         // No binding in bindings map
 
@@ -321,19 +303,16 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelDrifted_bindingPresentButNotInSpec() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        UUID channelId = UUID.randomUUID();
+        Channel ch = Channel.builder("dev/work")
+                .id(channelId)
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
 
-        ChannelConnectorBinding binding = new ChannelConnectorBinding();
-        binding.channelId = ch.id;
-        binding.inboundConnectorId = "slack";
-        binding.externalKey = "C12345";
-        binding.outboundConnectorId = "slack";
-        binding.outboundDestination = "#general";
-        bindings.put(ch.id, binding);
+        ChannelConnectorBinding binding = new ChannelConnectorBinding(
+                channelId, "slack", "C12345", "slack", "#general");
+        bindings.put(channelId, binding);
 
         // Spec has no binding fields (all null)
         var spec = new ChannelNodeSpec("dev/work", null, ChannelSemantic.APPEND,
@@ -344,10 +323,10 @@ class ChannelDriftCheckerTest {
 
     @Test
     void channelPresent_noBindingEitherSide() {
-        Channel ch = new Channel();
-        ch.id = UUID.randomUUID();
-        ch.name = "dev/work";
-        ch.semantic = ChannelSemantic.APPEND;
+        Channel ch = Channel.builder("dev/work")
+                .id(UUID.randomUUID())
+                .semantic(ChannelSemantic.APPEND)
+                .build();
         channels.put("dev/work:" + TENANCY_ID, ch);
         // No binding in bindings map, no binding in spec
 

@@ -90,7 +90,7 @@ class DeploymentLifecycleIntegrationTest {
     @Test
     void fullLifecycle_declare_compile_provision_readState() {
         // Declare 5 nodes (one of each type including endpoint)
-        var agentCap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var agentCap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var agentDisp = AgentDisposition.builder().delegation(false).build();
         var claudonyConfig = new ProviderConfig("claudony", Map.of("tools", "read,write"));
         var agentSpec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
@@ -120,7 +120,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of());
 
         // Compile
-        var desired = compiler.compile(deploymentGoals, graphFactory);
+        var desired = ((CompilationResult.SingleGraph) compiler.compile(deploymentGoals, graphFactory)).graph();
         assertThat(desired.nodes()).hasSize(5);
         assertThat(desired.dependencies()).hasSize(1);
 
@@ -165,7 +165,7 @@ class DeploymentLifecycleIntegrationTest {
     @Test
     void driftDetection_specHashChangeReportsDrifted() {
         // Create and provision an agent
-        var agentCap = new AgentCapability("cap-b", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var agentCap = new AgentCapability("cap-b", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var agentDisp = AgentDisposition.builder().delegation(false).build();
         var agentSpec = new AgentNodeSpec("agent-drift", "Original", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(agentCap), agentDisp, "US", "policy", null, List.of());
@@ -178,7 +178,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of());
 
-        var desired = compiler.compile(deploymentGoals, graphFactory);
+        var desired = ((CompilationResult.SingleGraph) compiler.compile(deploymentGoals, graphFactory)).graph();
         var provisionContext = new ProvisionContext(TENANCY_ID, desired);
         var node = desired.nodes().values().iterator().next();
         var result = provisioner.provision(node, provisionContext);
@@ -194,7 +194,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of(),
                 List.of());
-        var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
+        var modifiedDesired = ((CompilationResult.SingleGraph) compiler.compile(modifiedGoals, graphFactory)).graph();
 
         // Read actual state — should detect drift
         var actual = adapter.readActual(modifiedDesired, TENANCY_ID);
@@ -221,7 +221,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(new GoalEntry<>(endpointSpec, List.of())),
                 List.of());
 
-        var desired = compiler.compile(deploymentGoals, graphFactory);
+        var desired = ((CompilationResult.SingleGraph) compiler.compile(deploymentGoals, graphFactory)).graph();
         var provisionContext = new ProvisionContext(TENANCY_ID, desired);
         var node = desired.nodes().values().iterator().next();
         var result = provisioner.provision(node, provisionContext);
@@ -242,7 +242,7 @@ class DeploymentLifecycleIntegrationTest {
                 List.of(),
                 List.of(new GoalEntry<>(modifiedSpec, List.of())),
                 List.of());
-        var modifiedDesired = compiler.compile(modifiedGoals, graphFactory);
+        var modifiedDesired = ((CompilationResult.SingleGraph) compiler.compile(modifiedGoals, graphFactory)).graph();
 
         // Read actual state — should detect drift
         var actual = adapter.readActual(modifiedDesired, TENANCY_ID);
@@ -268,7 +268,7 @@ class DeploymentLifecycleIntegrationTest {
         var graph = graphFactory.empty();
         var event = new FaultEvent(NodeId.of("node-1"), FaultType.PROVISION_FAILED, "test error");
 
-        var mutations = faultPolicy.onFault(event, graph);
+        var mutations = faultPolicy.onFault(event, graph, new ActualState(Map.of()));
 
         assertThat(mutations).isEmpty();
     }
@@ -290,8 +290,10 @@ class DeploymentLifecycleIntegrationTest {
         }
 
         @Override
-        public List<AgentDescriptor> find(AgentQuery query) {
-            return new ArrayList<>(agents.values());
+        public List<AgentMatch> find(AgentQuery query) {
+            return agents.values().stream()
+                    .map(d -> new AgentMatch(d, null))
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 
@@ -310,19 +312,19 @@ class DeploymentLifecycleIntegrationTest {
 
         @Override
         public Channel create(ChannelCreateRequest req) {
-            Channel ch = new Channel();
-            ch.id = UUID.randomUUID();
-            ch.name = req.name();
-            ch.description = req.description();
-            ch.semantic = req.semantic();
-            ch.allowedTypes = req.allowedTypes() != null ? MessageType.serializeTypes(req.allowedTypes()) : null;
-            ch.deniedTypes = req.deniedTypes() != null ? MessageType.serializeTypes(req.deniedTypes()) : null;
-            ch.rateLimitPerChannel = req.rateLimitPerChannel();
-            ch.rateLimitPerInstance = req.rateLimitPerInstance();
-            ch.allowedWriters = req.allowedWriters();
-            ch.adminInstances = req.adminInstances();
-            ch.barrierContributors = req.barrierContributors();
-            channels.put(ch.name, ch);
+            Channel ch = Channel.builder(req.name())
+                    .id(UUID.randomUUID())
+                    .description(req.description())
+                    .semantic(req.semantic())
+                    .allowedTypes(req.allowedTypes())
+                    .deniedTypes(req.deniedTypes())
+                    .rateLimitPerChannel(req.rateLimitPerChannel())
+                    .rateLimitPerInstance(req.rateLimitPerInstance())
+                    .allowedWriters(req.allowedWriters())
+                    .adminInstances(req.adminInstances())
+                    .barrierContributors(req.barrierContributors())
+                    .build();
+            channels.put(ch.name(), ch);
             // Also store in channelStore with tenancy — using TENANCY_ID constant
             channelStore.put(ch, TENANCY_ID);
             return ch;
@@ -330,19 +332,19 @@ class DeploymentLifecycleIntegrationTest {
 
         @Override
         public void delete(UUID channelId, boolean force) {
-            channels.values().removeIf(ch -> ch.id.equals(channelId));
+            channels.values().removeIf(ch -> ch.id().equals(channelId));
             // Also remove from channelStore
-            channelStore.channels.entrySet().removeIf(e -> e.getValue().id.equals(channelId));
+            channelStore.channels.entrySet().removeIf(e -> e.getValue().id().equals(channelId));
         }
 
         @Override
         public Channel setTypeConstraints(UUID channelId, Set<MessageType> allowed, Set<MessageType> denied) {
             for (Channel ch : channels.values()) {
-                if (ch.id.equals(channelId)) {
-                    ch.allowedTypes = allowed != null ? MessageType.serializeTypes(allowed) : null;
-                    ch.deniedTypes = denied != null ? MessageType.serializeTypes(denied) : null;
-                    // Update is in-place, no need to update channelStore separately
-                    return ch;
+                if (ch.id().equals(channelId)) {
+                    Channel updated = ch.toBuilder().allowedTypes(allowed).deniedTypes(denied).build();
+                    channels.put(updated.name(), updated);
+                    channelStore.put(updated, TENANCY_ID);
+                    return updated;
                 }
             }
             return null;
@@ -351,35 +353,37 @@ class DeploymentLifecycleIntegrationTest {
         @Override
         public Channel setRateLimits(UUID channelId, Integer perChannel, Integer perInstance) {
             for (Channel ch : channels.values()) {
-                if (ch.id.equals(channelId)) {
-                    ch.rateLimitPerChannel = perChannel;
-                    ch.rateLimitPerInstance = perInstance;
-                    // Update is in-place, no need to update channelStore separately
-                    return ch;
+                if (ch.id().equals(channelId)) {
+                    Channel updated = ch.toBuilder().rateLimitPerChannel(perChannel).rateLimitPerInstance(perInstance).build();
+                    channels.put(updated.name(), updated);
+                    channelStore.put(updated, TENANCY_ID);
+                    return updated;
                 }
             }
             return null;
         }
 
         @Override
-        public Channel setAllowedWriters(UUID channelId, String allowedWriters) {
+        public Channel setAllowedWriters(UUID channelId, List<String> allowedWriters) {
             for (Channel ch : channels.values()) {
-                if (ch.id.equals(channelId)) {
-                    ch.allowedWriters = allowedWriters;
-                    // Update is in-place, no need to update channelStore separately
-                    return ch;
+                if (ch.id().equals(channelId)) {
+                    Channel updated = ch.toBuilder().allowedWriters(allowedWriters).build();
+                    channels.put(updated.name(), updated);
+                    channelStore.put(updated, TENANCY_ID);
+                    return updated;
                 }
             }
             return null;
         }
 
         @Override
-        public Channel setAdminInstances(UUID channelId, String adminInstances) {
+        public Channel setAdminInstances(UUID channelId, List<String> adminInstances) {
             for (Channel ch : channels.values()) {
-                if (ch.id.equals(channelId)) {
-                    ch.adminInstances = adminInstances;
-                    // Update is in-place, no need to update channelStore separately
-                    return ch;
+                if (ch.id().equals(channelId)) {
+                    Channel updated = ch.toBuilder().adminInstances(adminInstances).build();
+                    channels.put(updated.name(), updated);
+                    channelStore.put(updated, TENANCY_ID);
+                    return updated;
                 }
             }
             return null;
@@ -434,12 +438,12 @@ class DeploymentLifecycleIntegrationTest {
         @Override
         public Optional<Channel> findById(UUID id) {
             return channels.values().stream()
-                    .filter(ch -> ch.id.equals(id))
+                    .filter(ch -> ch.id().equals(id))
                     .findFirst();
         }
 
         void put(Channel channel, String tenancyId) {
-            channels.put(key(channel.name, tenancyId), channel);
+            channels.put(key(channel.name(), tenancyId), channel);
         }
     }
 
@@ -458,7 +462,7 @@ class DeploymentLifecycleIntegrationTest {
 
         @Override
         public void put(ChannelConnectorBinding binding) {
-            bindings.put(binding.channelId, binding);
+            bindings.put(binding.channelId(), binding);
         }
 
         @Override

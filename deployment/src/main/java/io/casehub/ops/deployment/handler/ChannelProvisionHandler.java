@@ -1,5 +1,6 @@
 package io.casehub.ops.deployment.handler;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -26,8 +27,8 @@ public class ChannelProvisionHandler {
         void delete(UUID channelId, boolean force);
         Channel setTypeConstraints(UUID channelId, Set<MessageType> allowed, Set<MessageType> denied);
         Channel setRateLimits(UUID channelId, Integer perChannel, Integer perInstance);
-        Channel setAllowedWriters(UUID channelId, String allowedWriters);
-        Channel setAdminInstances(UUID channelId, String adminInstances);
+        Channel setAllowedWriters(UUID channelId, List<String> allowedWriters);
+        Channel setAdminInstances(UUID channelId, List<String> adminInstances);
     }
 
     private final ChannelOperations ops;
@@ -40,8 +41,8 @@ public class ChannelProvisionHandler {
             @Override public void delete(UUID channelId, boolean force) { channelService.delete(channelId, force); }
             @Override public Channel setTypeConstraints(UUID id, Set<MessageType> a, Set<MessageType> d) { return channelService.setTypeConstraints(id, a, d); }
             @Override public Channel setRateLimits(UUID id, Integer pc, Integer pi) { return channelService.setRateLimits(id, pc, pi); }
-            @Override public Channel setAllowedWriters(UUID id, String w) { return channelService.setAllowedWriters(id, w); }
-            @Override public Channel setAdminInstances(UUID id, String a) { return channelService.setAdminInstances(id, a); }
+            @Override public Channel setAllowedWriters(UUID id, List<String> w) { return channelService.setAllowedWriters(id, w); }
+            @Override public Channel setAdminInstances(UUID id, List<String> a) { return channelService.setAdminInstances(id, a); }
         };
     }
 
@@ -52,13 +53,13 @@ public class ChannelProvisionHandler {
     public ProvisionResult provision(ChannelNodeSpec spec, ProvisionContext context) {
         Optional<Channel> existing = ops.findByName(spec.name());
         if (existing.isPresent()) {
-            updateMutableFields(existing.get().id, spec);
+            updateMutableFields(existing.get().id(), spec);
             return new ProvisionResult.Success();
         }
 
         var request = new ChannelCreateRequest(
                 spec.name(), spec.description(), spec.semantic(),
-                spec.barrierContributors(), spec.allowedWriters(), spec.adminInstances(),
+                toList(spec.barrierContributors()), toList(spec.allowedWriters()), toList(spec.adminInstances()),
                 spec.rateLimitPerChannel(), spec.rateLimitPerInstance(),
                 spec.allowedTypes(), spec.deniedTypes(),
                 spec.inboundConnectorId(), spec.externalKey(),
@@ -70,7 +71,7 @@ public class ChannelProvisionHandler {
     public DeprovisionResult deprovision(ChannelNodeSpec spec, DeprovisionContext context) {
         Optional<Channel> existing = ops.findByName(spec.name());
         if (existing.isPresent()) {
-            ops.delete(existing.get().id, true);
+            ops.delete(existing.get().id(), true);
         }
         return new DeprovisionResult.Success();
     }
@@ -78,7 +79,12 @@ public class ChannelProvisionHandler {
     private void updateMutableFields(UUID channelId, ChannelNodeSpec spec) {
         ops.setTypeConstraints(channelId, spec.allowedTypes(), spec.deniedTypes());
         ops.setRateLimits(channelId, spec.rateLimitPerChannel(), spec.rateLimitPerInstance());
-        ops.setAllowedWriters(channelId, spec.allowedWriters());
-        ops.setAdminInstances(channelId, spec.adminInstances());
+        ops.setAllowedWriters(channelId, toList(spec.allowedWriters()));
+        ops.setAdminInstances(channelId, toList(spec.adminInstances()));
+    }
+
+    private static List<String> toList(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        return List.of(csv.split(","));
     }
 }

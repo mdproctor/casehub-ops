@@ -2,6 +2,7 @@ package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.ras.api.ActiveSituation;
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
@@ -134,7 +135,7 @@ public final class AdaptationRule {
                     }
                 }
                 case AdaptationActionSpec.AddActionSpec a -> {
-                    DesiredStateGraph subGraph = compiler.compile(a.nodes(), factory);
+                    DesiredStateGraph subGraph = ((CompilationResult.SingleGraph) compiler.compile(a.nodes(), factory)).graph();
                     targets.addAll(subGraph.nodes().keySet());
                 }
             }

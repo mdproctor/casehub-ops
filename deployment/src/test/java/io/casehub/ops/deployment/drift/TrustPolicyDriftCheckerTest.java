@@ -32,7 +32,7 @@ class TrustPolicyDriftCheckerTest {
     @Test
     void trustPolicyPresent() {
         var spec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
-        var policy = new TrustRoutingPolicy(0.8, 5, 0.1, 0.5, Map.of(), false);
+        var policy = new TrustRoutingPolicy(0.8, 5, 0.1, 0.5, Map.of(), false, null);
         policyProvider.store("cap-a", policy);
 
         assertEquals(NodeStatus.PRESENT, checker.check(spec, TENANCY_ID));
@@ -48,7 +48,7 @@ class TrustPolicyDriftCheckerTest {
     @Test
     void trustPolicyDrifted_thresholdMismatch() {
         var spec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
-        var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false);
+        var policy = new TrustRoutingPolicy(0.7, 5, 0.1, 0.5, Map.of(), false, null);
         policyProvider.store("cap-a", policy);
 
         assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));
@@ -57,7 +57,7 @@ class TrustPolicyDriftCheckerTest {
     @Test
     void trustPolicyDrifted_minimumObservationsMismatch() {
         var spec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of(), false);
-        var policy = new TrustRoutingPolicy(0.8, 3, 0.1, 0.5, Map.of(), false);
+        var policy = new TrustRoutingPolicy(0.8, 3, 0.1, 0.5, Map.of(), false, null);
         policyProvider.store("cap-a", policy);
 
         assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));
@@ -66,7 +66,7 @@ class TrustPolicyDriftCheckerTest {
     @Test
     void trustPolicyDrifted_qualityFloorsMismatch() {
         var spec = new TrustPolicyNodeSpec("cap-a", 0.8, 5, 0.1, 0.5, Map.of("acc", 0.6), false);
-        var policy = new TrustRoutingPolicy(0.8, 5, 0.1, 0.5, Map.of("acc", 0.5), false);
+        var policy = new TrustRoutingPolicy(0.8, 5, 0.1, 0.5, Map.of("acc", 0.5), false, null);
         policyProvider.store("cap-a", policy);
 
         assertEquals(NodeStatus.DRIFTED, checker.check(spec, TENANCY_ID));

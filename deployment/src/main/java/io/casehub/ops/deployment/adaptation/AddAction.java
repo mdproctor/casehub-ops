@@ -1,5 +1,6 @@
 package io.casehub.ops.deployment.adaptation;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.ops.api.deployment.AdaptationActionSpec.AddActionSpec;
@@ -26,7 +27,7 @@ final class AddAction {
     }
 
     DesiredStateGraph apply(DesiredStateGraph graph) {
-        DesiredStateGraph subGraph = compiler.compile(spec.nodes(), factory);
+        DesiredStateGraph subGraph = ((CompilationResult.SingleGraph) compiler.compile(spec.nodes(), factory)).graph();
         return graph.overlay(subGraph);
     }
 }

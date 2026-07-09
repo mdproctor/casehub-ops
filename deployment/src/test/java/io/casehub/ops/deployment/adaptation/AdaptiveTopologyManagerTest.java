@@ -101,7 +101,7 @@ class AdaptiveTopologyManagerTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 1.0, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         assertThat(reconciliationLoop.updateDesiredCalls).hasSize(1);
         assertThat(reconciliationLoop.requestReconciliationCalls).hasSize(1);
@@ -130,7 +130,7 @@ class AdaptiveTopologyManagerTest {
         // No situations active
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         // updateDesired is still called (recompiles base), but graph has no adaptations
         assertThat(reconciliationLoop.updateDesiredCalls).hasSize(1);
@@ -141,7 +141,7 @@ class AdaptiveTopologyManagerTest {
 
     @Test
     void unknownTenancyIdIsNoop() {
-        manager.onSituationChange(new SituationChangeEvent("unknown-tenant", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("unknown-tenant", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "unknown-tenant", java.time.Instant.now())));
 
         assertThat(reconciliationLoop.updateDesiredCalls).isEmpty();
         assertThat(reconciliationLoop.requestReconciliationCalls).isEmpty();
@@ -178,7 +178,7 @@ class AdaptiveTopologyManagerTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.65, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Still adapted — the add action produced forensics-agent alongside risk-agent
@@ -206,7 +206,7 @@ class AdaptiveTopologyManagerTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.4, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // No adaptations — confidence below deactivateBelow, rule deactivated
@@ -245,7 +245,7 @@ class AdaptiveTopologyManagerTest {
         situationSource.setSituations("tenant-1", List.of(
             new ActiveSituation("volatility-spike", "_singleton", "tenant-1", 0.3, Map.of(), Instant.now(), Instant.now(), 0)));
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Cooldown prevents deactivation — forensics-agent still present
@@ -274,7 +274,7 @@ class AdaptiveTopologyManagerTest {
         // Situation disappears entirely
         situationSource.setSituations("tenant-1", List.of());
 
-        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED));
+        manager.onSituationChange(new SituationChangeEvent("tenant-1", "situation", "_singleton", SituationChangeEvent.ChangeType.TRIGGERED, io.casehub.ras.api.SituationContext.initial("situation", "_singleton", "tenant-1", java.time.Instant.now())));
 
         var updatedGraph = reconciliationLoop.updateDesiredCalls.get(0).graph;
         // Back to base topology — only the original agent

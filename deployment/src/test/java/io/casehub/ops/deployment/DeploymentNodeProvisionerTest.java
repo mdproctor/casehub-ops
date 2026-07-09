@@ -59,7 +59,7 @@ class DeploymentNodeProvisionerTest {
 
     @Test
     void dispatchesAgentToHandler() {
-        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var disp = AgentDisposition.builder().delegation(false).build();
         var spec = new AgentNodeSpec("agent-1", "Worker Agent", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), disp, "US", "policy", null, List.of());
@@ -250,8 +250,10 @@ class DeploymentNodeProvisionerTest {
         }
 
         @Override
-        public List<AgentDescriptor> find(AgentQuery query) {
-            return new ArrayList<>(descriptors.values());
+        public List<AgentMatch> find(AgentQuery query) {
+            return descriptors.values().stream()
+                    .map(d -> new AgentMatch(d, null))
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 
@@ -265,37 +267,37 @@ class DeploymentNodeProvisionerTest {
 
         @Override
         public Channel create(ChannelCreateRequest req) {
-            Channel ch = new Channel();
-            ch.id = UUID.randomUUID();
-            ch.name = req.name();
-            ch.semantic = req.semantic();
-            channels.put(ch.name, ch);
+            Channel ch = Channel.builder(req.name())
+                    .id(UUID.randomUUID())
+                    .semantic(req.semantic())
+                    .build();
+            channels.put(ch.name(), ch);
             return ch;
         }
 
         @Override
         public void delete(UUID channelId, boolean force) {
-            channels.values().removeIf(ch -> ch.id.equals(channelId));
+            channels.values().removeIf(ch -> ch.id().equals(channelId));
         }
 
         @Override
         public Channel setTypeConstraints(UUID channelId, Set<MessageType> allowed, Set<MessageType> denied) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
         public Channel setRateLimits(UUID channelId, Integer perChannel, Integer perInstance) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
-        public Channel setAllowedWriters(UUID channelId, String allowedWriters) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+        public Channel setAllowedWriters(UUID channelId, List<String> allowedWriters) {
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
 
         @Override
-        public Channel setAdminInstances(UUID channelId, String adminInstances) {
-            return channels.values().stream().filter(ch -> ch.id.equals(channelId)).findFirst().orElse(null);
+        public Channel setAdminInstances(UUID channelId, List<String> adminInstances) {
+            return channels.values().stream().filter(ch -> ch.id().equals(channelId)).findFirst().orElse(null);
         }
     }
 

@@ -6,9 +6,9 @@ import java.util.List;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
-import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.GoalCompiler;
 import io.casehub.desiredstate.api.NodeId;
@@ -34,7 +34,7 @@ public class DeploymentGoalCompiler implements GoalCompiler<DeploymentGoals> {
     }
 
     @Override
-    public DesiredStateGraph compile(DeploymentGoals goals, DesiredStateGraphFactory factory) {
+    public CompilationResult compile(DeploymentGoals goals, DesiredStateGraphFactory factory) {
         List<DesiredNode> nodes = new ArrayList<>();
         List<Dependency> dependencies = new ArrayList<>();
 
@@ -44,7 +44,7 @@ public class DeploymentGoalCompiler implements GoalCompiler<DeploymentGoals> {
         compileEntries(goals.trust(), nodes, dependencies);
         compileEntries(goals.endpoints(), nodes, dependencies);
 
-        return factory.of(nodes, dependencies);
+        return CompilationResult.single(factory.of(nodes, dependencies));
     }
 
     private List<GoalEntry<CaseTypeNodeSpec>> resolveCaseTypes(

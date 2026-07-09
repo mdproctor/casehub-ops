@@ -34,7 +34,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentPresent() {
-        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
@@ -49,7 +49,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentAbsent() {
-        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var spec = new AgentNodeSpec("agent-1", "Agent", "worker", "anthropic", "claude", "4.6",
                 "1.0", "fp1", "domain", "slot", "disp", Map.of(), List.of(cap), null, "US", "policy", null, List.of());
 
@@ -58,8 +58,8 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentDrifted_capabilitiesMismatch() {
-        var cap1 = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
-        var cap2 = new AgentCapability("cap-b", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap1 = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap2 = new AgentCapability("cap-b", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
 
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
@@ -84,7 +84,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentDrifted_dispositionMismatch() {
-        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var disp1 = new AgentDisposition("collaborative", "principled", "measured", "semi-autonomous", "compromising", false);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
@@ -101,7 +101,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentDrifted_briefingMismatch() {
-        var cap = new AgentCapability("cap-a", null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var cap = new AgentCapability("cap-a", null, null, null, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
@@ -116,8 +116,8 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentDrifted_capabilitySubFieldMismatch() {
-        var capDesired = new AgentCapability("cap-a", null, 0.85, null, null, List.of(), List.of(), List.of(), Map.of(), null);
-        var capActual = new AgentCapability("cap-a", null, 0.50, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var capDesired = new AgentCapability("cap-a", null, null, 0.85, null, null, List.of(), List.of(), List.of(), Map.of(), null);
+        var capActual = new AgentCapability("cap-a", null, null, 0.50, null, null, List.of(), List.of(), List.of(), Map.of(), null);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
                 "domain", "slot", "disp", Map.of(), "worker",
@@ -132,7 +132,7 @@ class AgentDriftCheckerTest {
 
     @Test
     void agentPresent_allFieldsMatch() {
-        var cap = new AgentCapability("cap-a", null, 0.85, 2000L, "medium", List.of("text"), List.of("text"), List.of("tag"), Map.of("java", 0.95), Set.of("cobol"));
+        var cap = new AgentCapability("cap-a", null, null, 0.85, 2000L, "medium", List.of("text"), List.of("text"), List.of("tag"), Map.of("java", 0.95), Set.of("cobol"));
         var disp = new AgentDisposition("collaborative", "principled", "measured", "semi-autonomous", "compromising", false);
         var descriptor = new AgentDescriptor(
                 "agent-1", "Agent", "1.0", "anthropic", "claude", "4.6", "fp1",
@@ -163,8 +163,10 @@ class AgentDriftCheckerTest {
         }
 
         @Override
-        public List<AgentDescriptor> find(AgentQuery query) {
-            return new ArrayList<>(agents.values());
+        public List<io.casehub.eidos.api.AgentMatch> find(AgentQuery query) {
+            return agents.values().stream()
+                    .map(d -> new io.casehub.eidos.api.AgentMatch(d, null))
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 }

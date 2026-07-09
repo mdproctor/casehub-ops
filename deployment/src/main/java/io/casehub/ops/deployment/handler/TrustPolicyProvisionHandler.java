@@ -34,7 +34,8 @@ public class TrustPolicyProvisionHandler {
                 spec.borderlineMargin(),
                 spec.blendFactor(),
                 spec.qualityFloors(),
-                spec.bootstrapEscalationRequired()
+                spec.bootstrapEscalationRequired(),
+                null
         );
         policyProvider.store(spec.capability(), policy);
         return new ProvisionResult.Success();

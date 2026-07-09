@@ -1,6 +1,7 @@
 package io.casehub.ops.deployment.adaptation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
@@ -185,7 +186,7 @@ public class AdaptiveTopologyManager {
     // --- private ---
 
     private DesiredStateGraph compileAdapted(String tenancyId, TenantAdaptationState state) {
-        DesiredStateGraph base = compiler.compile(state.goals(), graphFactory);
+        DesiredStateGraph base = ((CompilationResult.SingleGraph) compiler.compile(state.goals(), graphFactory)).graph();
         if (state.rules().isEmpty()) {
             return base;
         }
