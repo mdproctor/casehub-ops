@@ -1,6 +1,6 @@
 package io.casehub.ops.compliance;
 
-import io.casehub.ledger.api.model.LedgerEntry;
+import io.casehub.ledger.runtime.model.jpa.JpaLedgerEntry;
 import io.casehub.ops.api.compliance.EvidenceOutcome;
 import jakarta.persistence.*;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 @Entity
 @Table(name = "compliance_evidence_entry")
 @DiscriminatorValue("COMPLIANCE_EVIDENCE")
-public class ComplianceLedgerEntry extends LedgerEntry {
+public class ComplianceLedgerEntry extends JpaLedgerEntry {
 
     @Column(name = "control_id", nullable = false)
     public String controlId;

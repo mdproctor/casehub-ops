@@ -2,6 +2,7 @@ package io.casehub.ops.app.k8s;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.ActualStateAdapter;
@@ -9,8 +10,10 @@ import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeStatus;
+import io.casehub.desiredstate.api.NodeType;
 import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
 import io.casehub.ops.api.infra.InfraNodeSpec;
+import io.casehub.ops.app.goal.ApplicationNodeTypes;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -25,6 +28,16 @@ public class KubernetesActualStateAdapter implements ActualStateAdapter {
                                          K8sClientRegistry clientRegistry) {
         this.handlerRegistry = handlerRegistry;
         this.clientRegistry = clientRegistry;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(
+                ApplicationNodeTypes.K8S_NAMESPACE,
+                ApplicationNodeTypes.K8S_DEPLOYMENT,
+                ApplicationNodeTypes.K8S_SERVICE,
+                ApplicationNodeTypes.K8S_INGRESS,
+                ApplicationNodeTypes.K8S_CONFIGMAP);
     }
 
     @Override

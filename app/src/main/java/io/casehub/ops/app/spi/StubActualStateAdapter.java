@@ -1,12 +1,14 @@
 package io.casehub.ops.app.spi;
 
 import io.casehub.desiredstate.api.ActualState;
+import io.casehub.desiredstate.api.ActualStateAdapter;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeStatus;
-import io.casehub.desiredstate.api.ActualStateAdapter;
+import io.casehub.desiredstate.api.NodeType;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -16,6 +18,11 @@ import java.util.stream.Collectors;
 @DefaultBean
 @ApplicationScoped
 public class StubActualStateAdapter implements ActualStateAdapter {
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of();
+    }
 
     @Override
     public ActualState readActual(DesiredStateGraph desired, String tenancyId) {

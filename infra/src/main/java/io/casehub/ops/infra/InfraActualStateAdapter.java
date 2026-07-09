@@ -3,6 +3,7 @@ package io.casehub.ops.infra;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -15,6 +16,7 @@ import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeStatus;
+import io.casehub.desiredstate.api.NodeType;
 import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
 import io.casehub.ops.api.infra.spi.InfraBackend;
 import io.casehub.ops.api.infra.state.ResourceState;
@@ -45,6 +47,19 @@ public class InfraActualStateAdapter implements ActualStateAdapter {
     InfraActualStateAdapter(List<InfraBackend> backends) {
         this.backends = backends.stream()
                 .collect(Collectors.toMap(InfraBackend::backendId, b -> b));
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(
+                NodeType.of("k8s_namespace"),
+                NodeType.of("k8s_deployment"),
+                NodeType.of("k8s_service"),
+                NodeType.of("k8s_ingress"),
+                NodeType.of("compute_instance"),
+                NodeType.of("database_cluster"),
+                NodeType.of("terraform_workspace"),
+                NodeType.of("ansible_playbook"));
     }
 
     @Override

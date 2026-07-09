@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @ApplicationScoped
 public class DeploymentActualStateAdapter implements ActualStateAdapter {
@@ -33,6 +34,16 @@ public class DeploymentActualStateAdapter implements ActualStateAdapter {
             this.checkers.put(checker.nodeType(), checker);
         }
         this.specHashStore = specHashStore;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(
+                NodeType.of("agent"),
+                NodeType.of("channel"),
+                NodeType.of("case_type"),
+                NodeType.of("trust_policy"),
+                NodeType.of("endpoint"));
     }
 
     @Override

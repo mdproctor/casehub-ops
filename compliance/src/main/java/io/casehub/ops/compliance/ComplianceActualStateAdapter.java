@@ -6,6 +6,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @ApplicationScoped
 public class ComplianceActualStateAdapter implements ActualStateAdapter {
@@ -19,6 +20,11 @@ public class ComplianceActualStateAdapter implements ActualStateAdapter {
             ComplianceSpecHashStore specHashStore) {
         this.evidenceService = evidenceService;
         this.specHashStore = specHashStore;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return ComplianceNodeProvisioner.HANDLED_TYPES;
     }
 
     @Override

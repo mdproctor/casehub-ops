@@ -11,6 +11,16 @@ import java.util.Set;
 @ApplicationScoped
 public class ComplianceNodeProvisioner implements NodeProvisioner {
 
+    static final Set<NodeType> HANDLED_TYPES = Set.of(
+            NodeType.of("LOG_RETENTION"),
+            NodeType.of("ENCRYPTION_AT_REST"),
+            NodeType.of("ACCESS_REVIEW"),
+            NodeType.of("INCIDENT_RESPONSE"),
+            NodeType.of("DATA_PROCESSING"),
+            NodeType.of("AI_RISK_ASSESSMENT"),
+            NodeType.of("CERTIFICATE_EXPIRY"),
+            NodeType.of("CONFIG_HASH"));
+
     private final ComplianceEvidenceService evidenceService;
     private final ComplianceFrameworkRegistry registry;
     private final ComplianceSpecHashStore specHashStore;
@@ -33,13 +43,7 @@ public class ComplianceNodeProvisioner implements NodeProvisioner {
 
     @Override
     public Set<NodeType> handledTypes() {
-        return Set.of(
-                NodeType.of("LOG_RETENTION"),
-                NodeType.of("ENCRYPTION_AT_REST"),
-                NodeType.of("ACCESS_REVIEW"),
-                NodeType.of("INCIDENT_RESPONSE"),
-                NodeType.of("DATA_PROCESSING"),
-                NodeType.of("AI_RISK_ASSESSMENT"));
+        return HANDLED_TYPES;
     }
 
     @Override

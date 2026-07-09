@@ -6,6 +6,7 @@ import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeStatus;
+import io.casehub.desiredstate.api.NodeType;
 import io.casehub.iot.api.spi.DeviceRegistry;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.IoTNodeSpec;
@@ -15,6 +16,7 @@ import jakarta.inject.Inject;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @ApplicationScoped
 public class IoTActualStateAdapter implements ActualStateAdapter {
@@ -24,6 +26,11 @@ public class IoTActualStateAdapter implements ActualStateAdapter {
     @Inject
     public IoTActualStateAdapter(DeviceRegistry registry) {
         this.registry = registry;
+    }
+
+    @Override
+    public Set<NodeType> handledTypes() {
+        return Set.of(NodeType.of("physical-device"), NodeType.of("device-config"));
     }
 
     @Override
