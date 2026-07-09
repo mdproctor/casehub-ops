@@ -4,10 +4,10 @@ import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.ops.api.deployment.ChannelNodeSpec;
 import io.casehub.qhorus.api.channel.ChannelSemantic;
 import io.casehub.qhorus.api.message.MessageType;
-import io.casehub.qhorus.runtime.channel.Channel;
-import io.casehub.qhorus.runtime.channel.ChannelConnectorBinding;
-import io.casehub.qhorus.runtime.store.ChannelBindingStore;
-import io.casehub.qhorus.runtime.store.CrossTenantChannelStore;
+import io.casehub.qhorus.api.channel.Channel;
+import io.casehub.qhorus.api.channel.ChannelConnectorBinding;
+import io.casehub.qhorus.api.store.ChannelBindingStore;
+import io.casehub.qhorus.api.store.CrossTenantChannelStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
