@@ -1,12 +1,12 @@
 package io.casehub.ops.app.k8s;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.ops.api.infra.K8sDeploymentSpec;
+import io.casehub.ops.app.model.FieldDrift;
+import io.fabric8.kubernetes.api.model.ContainerPort;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerPortBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
@@ -24,6 +24,10 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 @ApplicationScoped
 public class K8sDeploymentHandler implements K8sResourceHandler<K8sDeploymentSpec> {
 
@@ -37,72 +41,70 @@ public class K8sDeploymentHandler implements K8sResourceHandler<K8sDeploymentSpe
     @Override
     public HasMetadata toResource(K8sDeploymentSpec spec) {
         var containerBuilder = new ContainerBuilder()
-                .withName(spec.name())
-                .withImage(spec.image())
-                .withResources(new ResourceRequirementsBuilder()
-                        .addToRequests("cpu", new Quantity(spec.resources().cpuRequest()))
-                        .addToRequests("memory", new Quantity(spec.resources().memoryRequest()))
-                        .addToLimits("cpu", new Quantity(spec.resources().cpuLimit()))
-                        .addToLimits("memory", new Quantity(spec.resources().memoryLimit()))
-                        .build())
-                .withPorts(spec.ports().stream()
-                        .map(p -> new ContainerPortBuilder()
-                                .withContainerPort(p.containerPort())
-                                .withProtocol(p.protocol())
-                                .build())
-                        .toList())
-                .withEnv(spec.env().entrySet().stream()
-                        .map(e -> new EnvVarBuilder()
-                                .withName(e.getKey())
-                                .withValue(e.getValue())
-                                .build())
-                        .toList());
+                                       .withName(spec.name())
+                                       .withImage(spec.image())
+                                       .withResources(new ResourceRequirementsBuilder()
+                                                              .addToRequests("cpu", new Quantity(spec.resources().cpuRequest()))
+                                                              .addToRequests("memory", new Quantity(spec.resources().memoryRequest()))
+                                                              .addToLimits("cpu", new Quantity(spec.resources().cpuLimit()))
+                                                              .addToLimits("memory", new Quantity(spec.resources().memoryLimit()))
+                                                              .build())
+                                       .withPorts(spec.ports().stream()
+                                                      .map(p -> new ContainerPortBuilder()
+                                                                        .withContainerPort(p.containerPort())
+                                                                        .withProtocol(p.protocol())
+                                                                        .build())
+                                                      .toList())
+                                       .withEnv(spec.env().entrySet().stream()
+                                                    .map(e -> new EnvVarBuilder()
+                                                                      .withName(e.getKey())
+                                                                      .withValue(e.getValue())
+                                                                      .build())
+                                                    .toList());
 
         spec.healthCheck().ifPresent(hc -> {
             Probe probe = new ProbeBuilder()
-                    .withNewHttpGet()
-                        .withPath(hc.path())
-                        .withPort(new IntOrString(hc.port()))
-                    .endHttpGet()
-                    .withInitialDelaySeconds(hc.initialDelaySeconds())
-                    .withPeriodSeconds(hc.periodSeconds())
-                    .build();
+                                  .withNewHttpGet()
+                                  .withPath(hc.path())
+                                  .withPort(new IntOrString(hc.port()))
+                                  .endHttpGet()
+                                  .withInitialDelaySeconds(hc.initialDelaySeconds())
+                                  .withPeriodSeconds(hc.periodSeconds())
+                                  .build();
             containerBuilder.withLivenessProbe(probe);
             containerBuilder.withReadinessProbe(probe);
         });
 
         return new DeploymentBuilder()
-                .withNewMetadata()
-                    .withName(spec.name())
-                    .withNamespace(spec.namespace())
-                    .withLabels(spec.labels().values())
-                .endMetadata()
-                .withNewSpec()
-                    .withReplicas(spec.replicas())
-                    .withNewSelector()
-                        .withMatchLabels(Map.of("app", spec.name()))
-                    .endSelector()
-                    .withNewTemplate()
-                        .withNewMetadata()
-                            .withLabels(Map.of("app", spec.name()))
-                        .endMetadata()
-                        .withNewSpec()
-                            .withContainers(containerBuilder.build())
-                        .endSpec()
-                    .endTemplate()
-                .endSpec()
-                .build();
+                       .withNewMetadata()
+                       .withName(spec.name())
+                       .withNamespace(spec.namespace())
+                       .withLabels(spec.labels().values())
+                       .endMetadata()
+                       .withNewSpec()
+                       .withReplicas(spec.replicas())
+                       .withNewSelector()
+                       .withMatchLabels(Map.of("app", spec.name()))
+                       .endSelector()
+                       .withNewTemplate()
+                       .withNewMetadata()
+                       .withLabels(Map.of("app", spec.name()))
+                       .endMetadata()
+                       .withNewSpec()
+                       .withContainers(containerBuilder.build())
+                       .endSpec()
+                       .endTemplate()
+                       .endSpec()
+                       .build();
     }
 
     @Override
     public NodeStatus readStatus(KubernetesClient client, K8sDeploymentSpec spec) {
         try {
-            Deployment actual = client.apps().deployments()
-                    .inNamespace(spec.namespace()).withName(spec.name()).get();
-            if (actual == null) return NodeStatus.ABSENT;
-
-            Deployment desired = (Deployment) toResource(spec);
-            return managedFieldsMatch(actual, desired) ? NodeStatus.PRESENT : NodeStatus.DRIFTED;
+            var actual = client.apps().deployments()
+                               .inNamespace(spec.namespace()).withName(spec.name()).get();
+            if (actual == null) {return NodeStatus.ABSENT;}
+            return readDiff(client, spec).isEmpty() ? NodeStatus.PRESENT : NodeStatus.DRIFTED;
         } catch (KubernetesClientException e) {
             return NodeStatus.UNKNOWN;
         }
@@ -117,51 +119,83 @@ public class K8sDeploymentHandler implements K8sResourceHandler<K8sDeploymentSpe
     @Override
     public void delete(KubernetesClient client, K8sDeploymentSpec spec) {
         client.apps().deployments()
-                .inNamespace(spec.namespace()).withName(spec.name()).delete();
+              .inNamespace(spec.namespace()).withName(spec.name()).delete();
     }
 
-    private boolean managedFieldsMatch(Deployment actual, Deployment desired) {
-        var actualContainer = actual.getSpec().getTemplate().getSpec().getContainers().get(0);
-        var desiredContainer = desired.getSpec().getTemplate().getSpec().getContainers().get(0);
+    @Override
+    public List<FieldDrift> readDiff(KubernetesClient client, K8sDeploymentSpec spec) {
+        try {
+            var actual = client.apps().deployments()
+                               .inNamespace(spec.namespace()).withName(spec.name()).get();
+            if (actual == null) {return List.of();}
 
-        if (!Objects.equals(actual.getSpec().getReplicas(), desired.getSpec().getReplicas())) return false;
-        if (!Objects.equals(actualContainer.getImage(), desiredContainer.getImage())) return false;
+            var desired = (Deployment) toResource(spec);
+            return computeDiffs(actual, desired);
+        } catch (KubernetesClientException e) {
+            return List.of();
+        }
+    }
 
-        Map<String, String> actualEnv = actualContainer.getEnv() == null
-                ? Map.of()
-                : actualContainer.getEnv().stream()
-                    .collect(Collectors.toMap(EnvVar::getName, EnvVar::getValue));
-        Map<String, String> desiredEnv = desiredContainer.getEnv() == null
-                ? Map.of()
-                : desiredContainer.getEnv().stream()
-                    .collect(Collectors.toMap(EnvVar::getName, EnvVar::getValue));
-        if (!actualEnv.equals(desiredEnv)) return false;
+    private List<FieldDrift> computeDiffs(Deployment actual, Deployment desired) {
+        var diffs = new ArrayList<FieldDrift>();
+        var ac    = actual.getSpec().getTemplate().getSpec().getContainers().get(0);
+        var dc    = desired.getSpec().getTemplate().getSpec().getContainers().get(0);
 
-        // Resource limits and requests
-        if (!Objects.equals(
-                actualContainer.getResources().getRequests(),
-                desiredContainer.getResources().getRequests())) return false;
-        if (!Objects.equals(
-                actualContainer.getResources().getLimits(),
-                desiredContainer.getResources().getLimits())) return false;
-
-        // Container ports
-        var actualPorts = actualContainer.getPorts();
-        var desiredPorts = desiredContainer.getPorts();
-        if (actualPorts == null || desiredPorts == null) {
-            if (actualPorts != desiredPorts) return false;
-        } else {
-            if (actualPorts.size() != desiredPorts.size()) return false;
-            for (int i = 0; i < actualPorts.size(); i++) {
-                if (!Objects.equals(actualPorts.get(i).getContainerPort(), desiredPorts.get(i).getContainerPort())) return false;
-                if (!Objects.equals(actualPorts.get(i).getProtocol(), desiredPorts.get(i).getProtocol())) return false;
-            }
+        if (!Objects.equals(actual.getSpec().getReplicas(), desired.getSpec().getReplicas())) {
+            diffs.add(new FieldDrift("replicas",
+                                     String.valueOf(desired.getSpec().getReplicas()),
+                                     String.valueOf(actual.getSpec().getReplicas())));
+        }
+        if (!Objects.equals(ac.getImage(), dc.getImage())) {
+            diffs.add(new FieldDrift("image", dc.getImage(), ac.getImage()));
         }
 
-        // Health check probes
-        if (!Objects.equals(actualContainer.getLivenessProbe(), desiredContainer.getLivenessProbe())) return false;
-        if (!Objects.equals(actualContainer.getReadinessProbe(), desiredContainer.getReadinessProbe())) return false;
+        Map<String, String> actualEnv = ac.getEnv() == null ? Map.of()
+                                                            : ac.getEnv().stream().collect(Collectors.toMap(EnvVar::getName, EnvVar::getValue));
+        Map<String, String> desiredEnv = dc.getEnv() == null ? Map.of()
+                                                             : dc.getEnv().stream().collect(Collectors.toMap(EnvVar::getName, EnvVar::getValue));
+        if (!actualEnv.equals(desiredEnv)) {
+            diffs.add(new FieldDrift("env", desiredEnv.toString(), actualEnv.toString()));
+        }
 
+        if (!Objects.equals(ac.getResources().getRequests(), dc.getResources().getRequests())) {
+            diffs.add(new FieldDrift("resourceRequests",
+                                     String.valueOf(dc.getResources().getRequests()),
+                                     String.valueOf(ac.getResources().getRequests())));
+        }
+        if (!Objects.equals(ac.getResources().getLimits(), dc.getResources().getLimits())) {
+            diffs.add(new FieldDrift("resourceLimits",
+                                     String.valueOf(dc.getResources().getLimits()),
+                                     String.valueOf(ac.getResources().getLimits())));
+        }
+
+        if (!portsMatch(ac.getPorts(), dc.getPorts())) {
+            diffs.add(new FieldDrift("ports",
+                                     String.valueOf(dc.getPorts()), String.valueOf(ac.getPorts())));
+        }
+
+        if (!Objects.equals(ac.getLivenessProbe(), dc.getLivenessProbe())) {
+            diffs.add(new FieldDrift("livenessProbe",
+                                     String.valueOf(dc.getLivenessProbe()), String.valueOf(ac.getLivenessProbe())));
+        }
+        if (!Objects.equals(ac.getReadinessProbe(), dc.getReadinessProbe())) {
+            diffs.add(new FieldDrift("readinessProbe",
+                                     String.valueOf(dc.getReadinessProbe()), String.valueOf(ac.getReadinessProbe())));
+        }
+
+        return List.copyOf(diffs);
+    }
+
+    private boolean portsMatch(List<?> actual, List<?> desired) {
+        if (actual == null && desired == null) {return true;}
+        if (actual == null || desired == null) {return false;}
+        if (actual.size() != desired.size()) {return false;}
+        for (int i = 0; i < actual.size(); i++) {
+            var ap = (ContainerPort) actual.get(i);
+            var dp = (ContainerPort) desired.get(i);
+            if (!Objects.equals(ap.getContainerPort(), dp.getContainerPort())) {return false;}
+            if (!Objects.equals(ap.getProtocol(), dp.getProtocol())) {return false;}
+        }
         return true;
     }
 }
