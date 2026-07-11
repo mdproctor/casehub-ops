@@ -292,7 +292,7 @@ class StartupRecoveryServiceTest {
     private static class RecordingClientRegistry {
         final List<String> registered = new ArrayList<>();
 
-        void register(String clusterId, String apiUrl) {
+        void register(String clusterId, String apiUrl, String credentialRef, boolean trustCerts) {
             registered.add(clusterId + "=" + apiUrl);
         }
     }

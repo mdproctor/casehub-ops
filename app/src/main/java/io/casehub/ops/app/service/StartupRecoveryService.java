@@ -26,6 +26,7 @@ import io.casehub.ops.app.model.ApplicationStatus;
 import io.casehub.ops.app.model.ServiceDefinition;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
@@ -49,8 +50,13 @@ public class StartupRecoveryService {
 
     private static final Logger LOG = Logger.getLogger(StartupRecoveryService.class.getName());
 
+    @FunctionalInterface
+    public interface ClusterRegistrar {
+        void register(String clusterId, String apiUrl, String credentialRef, boolean trustCerts);
+    }
+
     private final BiConsumer<String, DesiredStateGraph> loopStarter;
-    private final BiConsumer<String, String> clusterRegistrar;
+    private final ClusterRegistrar clusterRegistrar;
     private final ApplicationGoalCompiler goalCompiler;
     private final DesiredStateGraphFactory graphFactory;
     private final BiConsumer<String, String> loopKeyTracker;
@@ -74,7 +80,7 @@ public class StartupRecoveryService {
                                    ApplicationLifecycleService lifecycleService,
                                    DecommissionCompletionHandler decommissionHandler) {
         this.loopStarter = reconciliationLoop::start;
-        this.clusterRegistrar = clientRegistry::register;
+        this.clusterRegistrar = clientRegistry::register;  // 4-arg register(id, url, cred, trust)
         this.goalCompiler = goalCompiler;
         this.graphFactory = graphFactory;
         this.loopKeyTracker = lifecycleService::trackLoopKey;
@@ -94,7 +100,7 @@ public class StartupRecoveryService {
     StartupRecoveryService(BiConsumer<String, DesiredStateGraph> loopStarter,
                             ApplicationGoalCompiler goalCompiler,
                             DesiredStateGraphFactory graphFactory,
-                            BiConsumer<String, String> clusterRegistrar,
+                            ClusterRegistrar clusterRegistrar,
                             ApplicationLifecycleService lifecycleService,
                             BiConsumer<UUID, Set<String>> decommissionRegistrar,
                             Supplier<List<ClusterReferenceEntity>> allClustersSupplier,
@@ -112,7 +118,7 @@ public class StartupRecoveryService {
         this.clustersByTenancyLookup = clustersByTenancyLookup;
     }
 
-    void onStartup(@Observes StartupEvent event) {
+    void onStartup(@Observes @Priority(20) StartupEvent event) {
         recover();
     }
 
@@ -124,7 +130,7 @@ public class StartupRecoveryService {
         // 1. Register all known clusters in K8sClientRegistry
         List<ClusterReferenceEntity> clusters = allClustersSupplier.get();
         for (var cluster : clusters) {
-            clusterRegistrar.accept(cluster.id.toString(), cluster.apiUrl);
+            clusterRegistrar.register(cluster.id.toString(), cluster.apiUrl, cluster.credentialRef, cluster.trustCerts);
         }
         LOG.info("Registered " + clusters.size() + " clusters in K8sClientRegistry");
 

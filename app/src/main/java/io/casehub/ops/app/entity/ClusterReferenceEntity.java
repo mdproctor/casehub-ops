@@ -1,9 +1,5 @@
 package io.casehub.ops.app.entity;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
 import io.casehub.ops.app.model.ClusterStatus;
 import io.casehub.ops.app.model.ClusterType;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
@@ -14,6 +10,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "cluster_reference")
@@ -44,6 +44,9 @@ public class ClusterReferenceEntity extends PanacheEntityBase {
 
     @Column(name = "tenancy_id", nullable = false)
     public String tenancyId;
+    @Column(name = "trust_certs", nullable = false)
+    public boolean trustCerts = true;
+
 
     @Column(name = "created_at", nullable = false, updatable = false)
     public Instant createdAt;

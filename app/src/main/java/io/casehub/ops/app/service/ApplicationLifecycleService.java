@@ -80,7 +80,7 @@ public class ApplicationLifecycleService {
 
         for (ClusterReferenceEntity cluster : clusters) {
             // Ensure cluster is registered in K8sClientRegistry
-            clientRegistry.register(cluster.id.toString(), cluster.apiUrl);
+            clientRegistry.register(cluster.id.toString(), cluster.apiUrl, cluster.credentialRef, cluster.trustCerts);
 
             var graph = goalCompiler.compileForCluster(services, cluster.id.toString(),
                     cluster.namespace, graphFactory);

@@ -7,7 +7,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.casehub.desiredstate.api.ActualState;
+import io.casehub.desiredstate.api.ActualStateAdapterRouter;
 import io.casehub.desiredstate.api.DesiredStateGraph;
+import io.casehub.desiredstate.api.NodeType;
 import io.casehub.desiredstate.api.TransitionPlan;
 import io.casehub.desiredstate.api.TransitionResult;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
@@ -46,10 +48,17 @@ class ApplicationLifecycleServiceLoopTest {
         var planner = new TransitionPlanner();
         var faultEngine = new FaultPolicyEngine(List.of());
 
+        ActualStateAdapterRouter adapterRouter = new ActualStateAdapterRouter() {
+            @Override public ActualState readActual(DesiredStateGraph desired, String tenancyId) {
+                return new ActualState(Map.of());
+            }
+            @Override public Set<NodeType> allHandledTypes() { return Set.of(); }
+        };
+
         reconciliationLoop = new ReconciliationLoop(
                 planner,
                 (plan, tenancyId) -> Uni.createFrom().item(new TransitionResult(Map.of())),
-                (desired, tenancyId) -> new ActualState(Map.of()),
+                adapterRouter,
                 faultEngine,
                 () -> Multi.createFrom().empty(),
                 Duration.ofHours(1),

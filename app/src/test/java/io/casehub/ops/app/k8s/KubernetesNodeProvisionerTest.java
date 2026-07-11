@@ -36,7 +36,7 @@ class KubernetesNodeProvisionerTest {
 
         var handler = new StubHandler(NodeStatus.PRESENT);
         var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
         clientRegistry.register("ops-prod", "https://localhost:6443");
 
         var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
@@ -57,7 +57,7 @@ class KubernetesNodeProvisionerTest {
 
         var handler = new StubHandler(NodeStatus.PRESENT);
         var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
         clientRegistry.register("ops-prod", "https://localhost:6443");
 
         var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
@@ -83,7 +83,7 @@ class KubernetesNodeProvisionerTest {
             }
         };
         var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
         clientRegistry.register("ops-prod", "https://localhost:6443");
 
         var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
@@ -96,7 +96,7 @@ class KubernetesNodeProvisionerTest {
     @Test
     void handledTypesReturnsFiveK8sTypes() {
         var handlerRegistry = new K8sHandlerRegistry(List.of(new StubHandler(NodeStatus.PRESENT)));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
         var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
         assertThat(provisioner.handledTypes()).hasSize(5);
     }

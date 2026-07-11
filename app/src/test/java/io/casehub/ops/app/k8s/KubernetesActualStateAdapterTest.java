@@ -34,7 +34,7 @@ class KubernetesActualStateAdapterTest {
 
         var handler = new StubNamespaceHandler(NodeStatus.PRESENT);
         var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
         clientRegistry.register("ops-prod", "https://localhost:6443");
 
         var adapter = new KubernetesActualStateAdapter(handlerRegistry, clientRegistry);
@@ -54,7 +54,7 @@ class KubernetesActualStateAdapterTest {
 
         var handler = new StubNamespaceHandler(NodeStatus.PRESENT);
         var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
-        var clientRegistry = new K8sClientRegistry();
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
 
         var adapter = new KubernetesActualStateAdapter(handlerRegistry, clientRegistry);
         var actual = adapter.readActual(graph, "default");
