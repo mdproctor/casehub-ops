@@ -1,12 +1,5 @@
 package io.casehub.ops.infra.standalone;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.time.Instant;
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.ops.api.approval.ApprovalThresholds;
 import io.casehub.ops.api.approval.RiskClassification;
@@ -19,6 +12,12 @@ import io.casehub.ops.api.infra.spi.BackendProvisionResult;
 import io.casehub.ops.api.infra.spi.ResourceProvisioner;
 import io.casehub.ops.api.infra.state.ResourceStatus;
 import io.casehub.ops.api.infra.types.Labels;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class StandaloneBackendTest {
 
@@ -73,12 +72,12 @@ class StandaloneBackendTest {
     @Test
     void readStateReturnsStoredState() {
         var provisioner = new InMemoryResourceProvisioner();
-        var backend = new StandaloneBackend(List.of(provisioner));
+        var backend     = new StandaloneBackend(List.of(provisioner));
 
         var spec = new K8sNamespaceSpec("production", Labels.empty());
         backend.provision(spec, provisionContext(NODE_1)).await().indefinitely();
 
-        var state = backend.readState(NODE_1).await().indefinitely();
+        var state = backend.readState(NODE_1, spec).await().indefinitely();
 
         assertThat(state.nodeId()).isEqualTo(NODE_1);
         assertThat(state.status()).isEqualTo(ResourceStatus.HEALTHY);
@@ -88,9 +87,10 @@ class StandaloneBackendTest {
     @Test
     void readStateReturnsUnknownWhenNotProvisioned() {
         var provisioner = new InMemoryResourceProvisioner();
-        var backend = new StandaloneBackend(List.of(provisioner));
+        var backend     = new StandaloneBackend(List.of(provisioner));
 
-        var state = backend.readState(NODE_1).await().indefinitely();
+        var spec  = new K8sNamespaceSpec("staging", Labels.empty());
+        var state = backend.readState(NODE_1, spec).await().indefinitely();
 
         assertThat(state.nodeId()).isEqualTo(NODE_1);
         assertThat(state.status()).isEqualTo(ResourceStatus.UNKNOWN);
@@ -115,12 +115,12 @@ class StandaloneBackendTest {
     @Test
     void detectDriftReturnsNoDrift() {
         var provisioner = new InMemoryResourceProvisioner();
-        var backend = new StandaloneBackend(List.of(provisioner));
+        var backend     = new StandaloneBackend(List.of(provisioner));
 
         var spec = new K8sNamespaceSpec("production", Labels.empty());
         backend.provision(spec, provisionContext(NODE_1)).await().indefinitely();
 
-        var drift = backend.detectDrift(NODE_1).await().indefinitely();
+        var drift = backend.detectDrift(NODE_1, spec).await().indefinitely();
 
         assertThat(drift.nodeId()).isEqualTo(NODE_1);
         assertThat(drift.drifted()).isFalse();

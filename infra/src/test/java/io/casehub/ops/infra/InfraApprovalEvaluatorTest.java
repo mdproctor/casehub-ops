@@ -1,13 +1,5 @@
 package io.casehub.ops.infra;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-
-import org.junit.jupiter.api.Test;
-
 import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeSpec;
@@ -32,6 +24,13 @@ import io.casehub.ops.api.infra.state.ResourceState;
 import io.casehub.ops.api.infra.state.ResourceStatus;
 import io.casehub.ops.api.infra.types.Labels;
 import io.smallrye.mutiny.Uni;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class InfraApprovalEvaluatorTest {
 
@@ -75,13 +74,13 @@ class InfraApprovalEvaluatorTest {
         }
 
         @Override
-        public Uni<ResourceState> readState(NodeId nodeId) {
+        public Uni<ResourceState> readState(NodeId nodeId, InfraNodeSpec spec) {
             return Uni.createFrom().item(new ResourceState(
                     nodeId, "generic", ResourceStatus.HEALTHY, NOW, null, ResourceOutputs.empty()));
         }
 
         @Override
-        public Uni<DriftReport> detectDrift(NodeId nodeId) {
+        public Uni<DriftReport> detectDrift(NodeId nodeId, InfraNodeSpec spec) {
             return Uni.createFrom().item(new DriftReport(
                     nodeId, false, List.of(), NOW, id));
         }

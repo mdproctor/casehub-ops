@@ -1,30 +1,16 @@
 package io.casehub.ops.api.infra.spi;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNullPointerException;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import org.junit.jupiter.api.Test;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import io.casehub.desiredstate.api.NodeId;
-import io.casehub.ops.api.infra.GenericResourceSpec;
+import io.casehub.ops.api.approval.ApprovalThresholds;
+import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.InfraNodeSpec;
 import io.casehub.ops.api.infra.K8sNamespaceSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
 import io.casehub.ops.api.infra.context.ProvisionAction;
 import io.casehub.ops.api.infra.context.ProvisionPhase;
-import io.casehub.ops.api.approval.ApprovalThresholds;
-import io.casehub.ops.api.approval.RiskClassification;
 import io.casehub.ops.api.infra.goal.ImportDeclaration;
 import io.casehub.ops.api.infra.goal.InfraGoals;
 import io.casehub.ops.api.infra.goal.ResourceDeclaration;
@@ -39,13 +25,22 @@ import io.casehub.ops.api.infra.state.ResourceOutputs;
 import io.casehub.ops.api.infra.state.ResourceState;
 import io.casehub.ops.api.infra.state.ResourceStatus;
 import io.casehub.ops.api.infra.task.ArtifactProvenance;
-import io.casehub.ops.api.infra.task.ArtifactType;
-import io.casehub.ops.api.infra.task.ExecutionArtifact;
 import io.casehub.ops.api.infra.task.ProvisionOutcome;
 import io.casehub.ops.api.infra.task.ProvisionTask;
 import io.casehub.ops.api.infra.task.TaskAction;
 import io.casehub.ops.api.infra.types.Labels;
 import io.smallrye.mutiny.Uni;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 class InfraBackendContractTest {
 
@@ -76,14 +71,14 @@ class InfraBackendContractTest {
         }
 
         @Override
-        public Uni<ResourceState> readState(NodeId nodeId) {
+        public Uni<ResourceState> readState(NodeId nodeId, InfraNodeSpec spec) {
             return Uni.createFrom().item(new ResourceState(
                     nodeId, "generic_resource", ResourceStatus.HEALTHY,
                     Instant.now(), null, ResourceOutputs.empty()));
         }
 
         @Override
-        public Uni<DriftReport> detectDrift(NodeId nodeId) {
+        public Uni<DriftReport> detectDrift(NodeId nodeId, InfraNodeSpec spec) {
             return Uni.createFrom().item(new DriftReport(
                     nodeId, false, List.of(), Instant.now(), "stub"));
         }
@@ -127,8 +122,9 @@ class InfraBackendContractTest {
     @Test
     void readState_returnsHealthyState() {
         var backend = new StubBackend();
+        var spec    = new K8sNamespaceSpec("test-ns", Labels.empty());
 
-        ResourceState state = backend.readState(TEST_NODE_ID).await().indefinitely();
+        ResourceState state = backend.readState(TEST_NODE_ID, spec).await().indefinitely();
 
         assertThat(state.nodeId()).isEqualTo(TEST_NODE_ID);
         assertThat(state.status()).isEqualTo(ResourceStatus.HEALTHY);
@@ -138,8 +134,9 @@ class InfraBackendContractTest {
     @Test
     void detectDrift_returnsNonDrifted() {
         var backend = new StubBackend();
+        var spec = new K8sNamespaceSpec("test-ns", Labels.empty());
 
-        DriftReport report = backend.detectDrift(TEST_NODE_ID).await().indefinitely();
+        DriftReport report = backend.detectDrift(TEST_NODE_ID, spec).await().indefinitely();
 
         assertThat(report.nodeId()).isEqualTo(TEST_NODE_ID);
         assertThat(report.drifted()).isFalse();

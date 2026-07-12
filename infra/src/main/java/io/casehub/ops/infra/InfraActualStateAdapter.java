@@ -1,15 +1,5 @@
 package io.casehub.ops.infra;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Any;
-import jakarta.enterprise.inject.Instance;
-
 import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.ActualStateAdapter;
 import io.casehub.desiredstate.api.DesiredNode;
@@ -21,7 +11,16 @@ import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
 import io.casehub.ops.api.infra.spi.InfraBackend;
 import io.casehub.ops.api.infra.state.ResourceState;
 import io.casehub.ops.api.infra.state.ResourceStatus;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Reads actual infrastructure state by delegating per-node readState() calls
@@ -81,12 +80,11 @@ public class InfraActualStateAdapter implements ActualStateAdapter {
         }
 
         try {
-            ResourceState state = backend.readState(node.id()).await().indefinitely();
+            ResourceState state = backend.readState(node.id(), wrapper.resourceSpec()).await().indefinitely();
             return mapStatus(state.status());
         } catch (Exception e) {
             return NodeStatus.UNKNOWN;
-        }
-    }
+        }}
 
     private NodeStatus mapStatus(ResourceStatus status) {
         return switch (status) {

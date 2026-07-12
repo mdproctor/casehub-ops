@@ -1,14 +1,5 @@
 package io.casehub.ops.infra.standalone;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Any;
-import jakarta.enterprise.inject.Instance;
-
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.ops.api.infra.InfraNodeSpec;
 import io.casehub.ops.api.infra.context.InfraProvisionContext;
@@ -25,7 +16,15 @@ import io.casehub.ops.api.infra.task.ProvisionOutcome;
 import io.casehub.ops.api.infra.task.ProvisionTask;
 import io.casehub.ops.api.infra.task.TaskAction;
 import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * CaseHub-native provisioning backend. Delegates task execution to
@@ -93,7 +92,7 @@ public class StandaloneBackend implements InfraBackend {
     }
 
     @Override
-    public Uni<ResourceState> readState(NodeId nodeId) {
+    public Uni<ResourceState> readState(NodeId nodeId, InfraNodeSpec spec) {
         var state = stateStore.get(nodeId);
         if (state != null) {
             return Uni.createFrom().item(state);
@@ -103,8 +102,7 @@ public class StandaloneBackend implements InfraBackend {
     }
 
     @Override
-    public Uni<DriftReport> detectDrift(NodeId nodeId) {
-        // PoC: in-memory state is always consistent — no external state to drift against
+    public Uni<DriftReport> detectDrift(NodeId nodeId, InfraNodeSpec spec) {
         return Uni.createFrom().item(new DriftReport(
                 nodeId, false, List.of(), Instant.now(), backendId()));
     }
