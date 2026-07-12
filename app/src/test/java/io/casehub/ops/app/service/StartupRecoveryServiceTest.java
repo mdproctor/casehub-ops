@@ -61,6 +61,7 @@ class StartupRecoveryServiceTest {
                 clientRegistry::register,
                 lifecycleService,
                 decommissionHandler::registerDecommission,
+                (clusterId, namespace) -> {},
                 () -> allClusters,
                 () -> activeApps,
                 tenancyId -> clustersByTenancy.getOrDefault(tenancyId, List.of()));

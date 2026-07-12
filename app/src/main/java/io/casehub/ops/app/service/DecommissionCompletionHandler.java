@@ -42,15 +42,14 @@ import java.util.logging.Logger;
 public class DecommissionCompletionHandler {
 
     private static final Logger LOG = Logger.getLogger(DecommissionCompletionHandler.class.getName());
-
+    private static final long                                 TIMEOUT_MINUTES = 10;
     private final Consumer<String> loopStopper;
     private final Consumer<String> keyRemover;
-    private final Consumer<UUID> statusTransitioner;
-
-    /** appId -> Set of composite keys still pending convergence */
-    private final ConcurrentHashMap<UUID, Set<String>> tracking = new ConcurrentHashMap<>();
-    private static final long                          TIMEOUT_MINUTES = 10;
-
+    private final Consumer<UUID>   statusTransitioner;
+    /**
+     * appId -> Set of composite keys still pending convergence
+     */
+    private final        ConcurrentHashMap<UUID, Set<String>> tracking        = new ConcurrentHashMap<>();
     /**
      * appId -> registration time for staleness detection
      */
@@ -60,21 +59,35 @@ public class DecommissionCompletionHandler {
     @Inject
     ObjectMapper objectMapper;
 
-    /** CDI constructor — delegates to ReconciliationLoop.stop(), ApplicationLifecycleService.removeLoopKey(), and markDecommissioned(). */
+    /**
+     * CDI constructor — delegates to ReconciliationLoop.stop(), ApplicationLifecycleService.removeLoopKey(), and markDecommissioned().
+     */
     @Inject
     public DecommissionCompletionHandler(ReconciliationLoop reconciliationLoop,
-                                          ApplicationLifecycleService lifecycleService) {
-        this.loopStopper = reconciliationLoop::stop;
-        this.keyRemover = lifecycleService::removeLoopKey;
+                                         ApplicationLifecycleService lifecycleService) {
+        this.loopStopper        = reconciliationLoop::stop;
+        this.keyRemover         = lifecycleService::removeLoopKey;
         this.statusTransitioner = lifecycleService::markDecommissioned;
     }
 
-    /** Test constructor with functional delegates. */
+    /**
+     * Test constructor with functional delegates.
+     */
     DecommissionCompletionHandler(Consumer<String> loopStopper, Consumer<String> keyRemover,
                                   Consumer<UUID> statusTransitioner) {
-        this.loopStopper = loopStopper;
-        this.keyRemover = keyRemover;
+        this.loopStopper        = loopStopper;
+        this.keyRemover         = keyRemover;
         this.statusTransitioner = statusTransitioner;
+    }
+
+    /**
+     * Returns a default ObjectMapper for use in unit tests where CDI injection
+     * is not available.
+     */
+    private static ObjectMapper defaultMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        return mapper;
     }
 
     /**
@@ -86,7 +99,8 @@ public class DecommissionCompletionHandler {
         tracking.put(appId, ConcurrentHashMap.newKeySet());
         tracking.get(appId).addAll(compositeKeys);
         registeredAt.put(appId, java.time.Instant.now());
-        LOG.fine(() -> "Registered decommission for app " + appId + " with " + compositeKeys.size() + " keys");}
+        LOG.fine(() -> "Registered decommission for app " + appId + " with " + compositeKeys.size() + " keys");
+    }
 
     /**
      * Cancels decommission tracking for an application. Called by deploy()
@@ -98,7 +112,8 @@ public class DecommissionCompletionHandler {
         registeredAt.remove(appId);
         if (removed != null) {
             LOG.fine(() -> "Cancelled decommission tracking for app " + appId);
-        }}
+        }
+    }
 
     /**
      * CDI async observer for CloudEvents fired by ReconciliationLoop.
@@ -145,8 +160,8 @@ public class DecommissionCompletionHandler {
 
         // Find and update the tracking entry for the parent app
         for (var entry : tracking.entrySet()) {
-            UUID appId = entry.getKey();
-            Set<String> keys = entry.getValue();
+            UUID        appId = entry.getKey();
+            Set<String> keys  = entry.getValue();
             if (keys.remove(compositeKey) && keys.isEmpty()) {
                 tracking.remove(appId);
                 statusTransitioner.accept(appId);
@@ -155,7 +170,9 @@ public class DecommissionCompletionHandler {
         }
     }
 
-    /** Returns true if the application is being tracked for decommission. */
+    /**
+     * Returns true if the application is being tracked for decommission.
+     */
     public boolean isTracking(UUID appId) {
         return tracking.containsKey(appId);
     }
@@ -184,8 +201,9 @@ public class DecommissionCompletionHandler {
         }
     }
 
-
-    /** Returns true if the composite key is tracked by any decommission entry. */
+    /**
+     * Returns true if the composite key is tracked by any decommission entry.
+     */
     private boolean isTrackedKey(String compositeKey) {
         for (Set<String> keys : tracking.values()) {
             if (keys.contains(compositeKey)) {
@@ -193,15 +211,5 @@ public class DecommissionCompletionHandler {
             }
         }
         return false;
-    }
-
-    /**
-     * Returns a default ObjectMapper for use in unit tests where CDI injection
-     * is not available.
-     */
-    private static ObjectMapper defaultMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        return mapper;
     }
 }

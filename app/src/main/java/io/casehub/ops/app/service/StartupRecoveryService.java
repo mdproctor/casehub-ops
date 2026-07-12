@@ -57,6 +57,7 @@ public class StartupRecoveryService {
     private final DesiredStateGraphFactory graphFactory;
     private final BiConsumer<String, String> loopKeyTracker;
     private final BiConsumer<UUID, Set<String>> decommissionRegistrar;
+    private final BiConsumer<String, String> watchStarter;
 
     private final Supplier<List<ClusterReferenceEntity>> allClustersSupplier;
     private final Supplier<List<ApplicationEntity>> activeAppsSupplier;
@@ -74,13 +75,15 @@ public class StartupRecoveryService {
                                    DesiredStateGraphFactory graphFactory,
                                    K8sClientRegistry clientRegistry,
                                    ApplicationLifecycleService lifecycleService,
-                                   DecommissionCompletionHandler decommissionHandler) {
+                                   DecommissionCompletionHandler decommissionHandler,
+                                   io.casehub.ops.app.k8s.K8sWatchManager watchManager) {
         this.loopStarter = reconciliationLoop::start;
-        this.clusterRegistrar = clientRegistry::register;  // 4-arg register(id, url, cred, trust)
+        this.clusterRegistrar = clientRegistry::register;
         this.goalCompiler = goalCompiler;
         this.graphFactory = graphFactory;
         this.loopKeyTracker = lifecycleService::trackLoopKey;
         this.decommissionRegistrar = decommissionHandler::registerDecommission;
+        this.watchStarter = watchManager::startWatching;
 
         this.allClustersSupplier = ClusterReferenceEntity::listAll;
         this.activeAppsSupplier = () -> ApplicationEntity.list(
@@ -99,6 +102,7 @@ public class StartupRecoveryService {
                             ClusterRegistrar clusterRegistrar,
                             ApplicationLifecycleService lifecycleService,
                             BiConsumer<UUID, Set<String>> decommissionRegistrar,
+                            BiConsumer<String, String> watchStarter,
                             Supplier<List<ClusterReferenceEntity>> allClustersSupplier,
                             Supplier<List<ApplicationEntity>> activeAppsSupplier,
                             Function<String, List<ClusterReferenceEntity>> clustersByTenancyLookup) {
@@ -108,6 +112,7 @@ public class StartupRecoveryService {
         this.graphFactory = graphFactory;
         this.loopKeyTracker = lifecycleService::trackLoopKey;
         this.decommissionRegistrar = decommissionRegistrar;
+        this.watchStarter = watchStarter;
 
         this.allClustersSupplier = allClustersSupplier;
         this.activeAppsSupplier = activeAppsSupplier;
@@ -160,6 +165,7 @@ public class StartupRecoveryService {
             try {
                 loopStarter.accept(key, graph);
                 loopKeyTracker.accept(cluster.id.toString(), key);
+                watchStarter.accept(cluster.id.toString(), cluster.namespace);
                 compositeKeys.add(key);
                 LOG.fine(() -> "Recovered loop for " + key);
             } catch (Exception e) {
@@ -174,7 +180,8 @@ public class StartupRecoveryService {
 
     private List<ServiceDefinition> parseServices(String json) {
         ObjectMapper mapper = objectMapper != null ? objectMapper : defaultMapper();
-        return ServiceDefinitionParser.parse(json, mapper);}
+        return ServiceDefinitionParser.parse(json, mapper);
+    }
 
     private static ObjectMapper defaultMapper() {
         ObjectMapper mapper = new ObjectMapper();

@@ -491,7 +491,7 @@ Not closed here: TerraformBackend and AnsibleBackend are designed but not implem
 
 - `infra/.../InfraGoalCompiler.java` — YAML goals → DesiredStateGraph with InfraDesiredNodeSpec nodes
 - `infra/.../InfraNodeProvisioner.java` — unwraps InfraDesiredNodeSpec, resolves backend by backendId, dispatches
-- `infra/.../InfraActualStateAdapter.java` — iterates desired nodes, delegates per-node to InfraBackend.readState()
+- `infra/.../InfraActualStateAdapter.java` — iterates desired nodes, delegates per-node to InfraBackend.readState(NodeId, InfraNodeSpec)
 - `infra/.../InfraFaultPolicy.java` — default fault rules, graph mutations for permanent failures only
 - `infra/.../InfraEventSource.java` — passive hot Multi<StateEvent> with emit()/emitDrift()
 - `infra/.../standalone/StandaloneBackend.java` — CaseHub-native provisioning via ResourceProvisioner SPI
@@ -500,7 +500,7 @@ Not closed here: TerraformBackend and AnsibleBackend are designed but not implem
 
 **Backend discovery via `@Any Instance<InfraBackend>`.** All backends are `@ApplicationScoped` and coexist. The provisioner iterates the CDI instance to find the backend matching `backendId()`. Same pattern as casehub-iot's `DeviceProvider` with `providerId()`.
 
-**EventSource is passive.** The `InfraEventSource` exposes `emit()` and `emitDrift()` but has no internal scheduler. Drift detection requires external callers to push events. Poll-based drift detection depends on the `ReconciliationLoop` (casehub-desiredstate#19).
+**EventSource is passive in infra; active in app.** The `InfraEventSource` exposes `emit()` and `emitDrift()` but has no internal scheduler. The `app` module's `KubernetesEventSource` is augmented by `K8sWatchManager`, which subscribes fabric8 Watch instances per managed namespace/cluster (filtered by `managed-by=casehub-ops` label) and emits `StateEvent` on external MODIFIED/DELETED events for sub-second drift detection. The 5-minute periodic resync remains as a safety net.
 
 #### Gotchas
 
@@ -799,7 +799,7 @@ Sparse — most decisions are documented inline in the layer entries above. Cros
 | Debt | Source | Resolution path |
 |---|---|---|
 | Stubbed EvidenceCollectors | C3 compliance PoC | Real implementations when specific cloud/identity integrations are built |
-| Passive EventSource in all modules | All chapters | Active polling/subscription when ReconciliationLoop drives scheduling |
+| Passive EventSource in infra, compliance, iot | C1, C3, C4 | Active Watch now in app (C2); other modules pending when needed |
 | In-memory SpecHashStore | C2 deployment, C3 compliance | Persistent store if restart-resilient hash tracking needed |
 | Case type drift always PRESENT | C2 deployment | `CaseDefinitionRegistry.findByIdentity()` SPI change needed |
 

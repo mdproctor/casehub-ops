@@ -48,6 +48,9 @@ public class ApplicationLifecycleService {
 
     @Inject
     DeploymentOutcomeTracker deploymentOutcomeTracker;
+    @Inject
+    io.casehub.ops.app.k8s.K8sWatchManager watchManager;
+
 
     /** Active loop index: clusterId -> Set of composite keys */
     private final ConcurrentHashMap<String, Set<String>> activeLoops = new ConcurrentHashMap<>();
@@ -67,21 +70,19 @@ public class ApplicationLifecycleService {
 
     public void deploy(UUID applicationId, String tenancyId) {
         var app = ApplicationEntity.<ApplicationEntity>findById(applicationId);
-        if (app == null) throw new IllegalArgumentException("Application not found: " + applicationId);
+        if (app == null) {throw new IllegalArgumentException("Application not found: " + applicationId);}
 
-        // Cancel any in-progress decommission before starting/updating loops
         decommissionHandler.cancelDecommission(app.id);
 
-        List<ServiceDefinition> services = parseServices(app.servicesJson);
-        List<ClusterReferenceEntity> clusters = clusterService.list(tenancyId);
-        Set<String> clusterIds = new HashSet<>();
+        List<ServiceDefinition>      services   = parseServices(app.servicesJson);
+        List<ClusterReferenceEntity> clusters   = clusterService.list(tenancyId);
+        Set<String>                  clusterIds = new HashSet<>();
 
         for (ClusterReferenceEntity cluster : clusters) {
-            // Ensure cluster is registered in K8sClientRegistry
             clientRegistry.register(cluster.id.toString(), cluster.apiUrl, cluster.credentialRef, cluster.trustCerts);
 
             var graph = goalCompiler.compileForCluster(services, cluster.id.toString(),
-                    cluster.namespace, graphFactory);
+                                                       cluster.namespace, graphFactory);
 
             String key = tenancyId + ":" + applicationId + ":" + cluster.id;
             try {
@@ -91,18 +92,18 @@ public class ApplicationLifecycleService {
             }
             trackLoopKey(cluster.id.toString(), key);
             clusterIds.add(cluster.id.toString());
+
+            watchManager.startWatching(cluster.id.toString(), cluster.namespace);
         }
 
         updateStatus(app, ApplicationStatus.DEPLOYING);
         var deploymentRecord = recordDeployment(app, DeploymentTrigger.INITIAL, DeploymentOutcome.PENDING);
 
-        // Register with deployment outcome tracker for cross-cluster convergence
         deploymentOutcomeTracker.registerDeployment(deploymentRecord.id, clusterIds);
         for (ClusterReferenceEntity cluster : clusters) {
             String key = tenancyId + ":" + applicationId + ":" + cluster.id;
             deploymentOutcomeTracker.associateKey(deploymentRecord.id, cluster.id.toString(), key);
-        }
-    }
+        }}
 
     public void decommission(UUID applicationId, String tenancyId) {
         var app = ApplicationEntity.<ApplicationEntity>findById(applicationId);

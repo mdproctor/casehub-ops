@@ -38,18 +38,20 @@ import java.util.logging.Logger;
 public class DeploymentOutcomeTracker {
 
     private static final Logger LOG = Logger.getLogger(DeploymentOutcomeTracker.class.getName());
-
-    /** deploymentId -> (clusterId -> converged) */
+    private static final long                              TIMEOUT_MINUTES = 10;
+    /**
+     * deploymentId -> (clusterId -> converged)
+     */
     private final ConcurrentHashMap<UUID, ConcurrentHashMap<String, Boolean>> tracking
             = new ConcurrentHashMap<>();
-
-    /** compositeKey -> deploymentId — reverse index for event correlation */
+    /**
+     * compositeKey -> deploymentId — reverse index for event correlation
+     */
     private final ConcurrentHashMap<String, UUID> keyToDeployment = new ConcurrentHashMap<>();
-
-    /** compositeKey -> clusterId — maps composite keys back to cluster IDs */
-    private final ConcurrentHashMap<String, String> keyToCluster = new ConcurrentHashMap<>();
-    private static final long                       TIMEOUT_MINUTES = 10;
-
+    /**
+     * compositeKey -> clusterId — maps composite keys back to cluster IDs
+     */
+    private final        ConcurrentHashMap<String, String> keyToCluster    = new ConcurrentHashMap<>();
     /**
      * deploymentId -> registration time for staleness detection
      */
@@ -59,8 +61,20 @@ public class DeploymentOutcomeTracker {
     @Inject
     ObjectMapper objectMapper;
 
-    /** No-arg constructor for CDI proxy and plain unit tests. */
+    /**
+     * No-arg constructor for CDI proxy and plain unit tests.
+     */
     public DeploymentOutcomeTracker() {
+    }
+
+    /**
+     * Returns a default ObjectMapper for use in unit tests where CDI injection
+     * is not available.
+     */
+    private static ObjectMapper defaultMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        return mapper;
     }
 
     /**
@@ -74,7 +88,8 @@ public class DeploymentOutcomeTracker {
         }
         tracking.put(deploymentId, clusterMap);
         registeredAt.put(deploymentId, java.time.Instant.now());
-        LOG.fine(() -> "Registered deployment " + deploymentId + " tracking " + clusterIds.size() + " clusters");}
+        LOG.fine(() -> "Registered deployment " + deploymentId + " tracking " + clusterIds.size() + " clusters");
+    }
 
     /**
      * Associates a composite key with a deployment and cluster, enabling
@@ -107,7 +122,7 @@ public class DeploymentOutcomeTracker {
         }
 
         String compositeKey = data.tenancyId();
-        UUID deploymentId = keyToDeployment.get(compositeKey);
+        UUID   deploymentId = keyToDeployment.get(compositeKey);
         if (deploymentId == null) {
             return; // Not a tracked deployment
         }
@@ -133,15 +148,19 @@ public class DeploymentOutcomeTracker {
         }
     }
 
-    /** Returns true if the deployment is actively being tracked. */
+    /**
+     * Returns true if the deployment is actively being tracked.
+     */
     public boolean isTracking(UUID deploymentId) {
         return tracking.containsKey(deploymentId);
     }
 
-    /** Returns true if the given cluster has converged for the deployment. */
+    /**
+     * Returns true if the given cluster has converged for the deployment.
+     */
     public boolean isConverged(UUID deploymentId, String clusterId) {
         ConcurrentHashMap<String, Boolean> clusterMap = tracking.get(deploymentId);
-        if (clusterMap == null) return false;
+        if (clusterMap == null) {return false;}
         return Boolean.TRUE.equals(clusterMap.get(clusterId));
     }
 
@@ -160,12 +179,11 @@ public class DeploymentOutcomeTracker {
                 if (removed != null) {
                     keyToDeployment.entrySet().removeIf(e -> e.getValue().equals(deploymentId));
                     keyToCluster.entrySet().removeIf(e -> !keyToDeployment.containsKey(e.getKey()));
-                    LOG.warning("Deployment " + deploymentId + " timed out after " + TIMEOUT_MINUTES + " minutes — marking FAILED");
+                    LOG.warning("Deployment " + deploymentId + " timed out after " + TIMEOUT_MINUTES + " minutes — removed from tracking");
                 }
             }
         }
     }
-
 
     private boolean allConverged(Map<String, Boolean> clusterMap) {
         return clusterMap.values().stream().allMatch(Boolean.TRUE::equals);
@@ -186,15 +204,6 @@ public class DeploymentOutcomeTracker {
             keyToDeployment.entrySet().removeIf(e -> e.getValue().equals(deploymentId));
             keyToCluster.entrySet().removeIf(e -> !keyToDeployment.containsKey(e.getKey()));
             LOG.info("Deployment " + deploymentId + " fully converged — all clusters clean");
-        }}
-
-    /**
-     * Returns a default ObjectMapper for use in unit tests where CDI injection
-     * is not available.
-     */
-    private static ObjectMapper defaultMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        return mapper;
+        }
     }
 }
