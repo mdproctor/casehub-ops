@@ -1,13 +1,5 @@
 package io.casehub.ops.app.service;
 
-import java.net.URI;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.desiredstate.api.DesiredStateEventTypes;
@@ -17,7 +9,16 @@ import io.cloudevents.core.builder.CloudEventBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /**
  * Plain unit tests for DecommissionCompletionHandler.
@@ -194,6 +195,33 @@ class DecommissionCompletionHandlerTest {
         // Second call — already stopped, should not throw
         assertThatNoException().isThrownBy(() -> handler.onKeyConverged(key));
     }
+
+    @Test
+    void cleanupStaleDecommissionsForceStopsTimedOutApps() {
+        var appId = UUID.randomUUID();
+        var key1  = "default:" + appId + ":c1";
+        var key2  = "default:" + appId + ":c2";
+        handler.registerDecommission(appId, Set.of(key1, key2));
+
+        handler.cleanupStaleDecommissions(Instant.now().plus(java.time.Duration.ofMinutes(11)));
+
+        assertThat(handler.isTracking(appId)).isFalse();
+        assertThat(loopStopper.stopped).containsExactlyInAnyOrder(key1, key2);
+        assertThat(keyRemover.removed).containsExactlyInAnyOrder(key1, key2);
+        assertThat(statusTransitioner.transitioned).containsExactly(appId);
+    }
+
+    @Test
+    void cleanupStaleDecommissionsKeepsRecentApps() {
+        var appId = UUID.randomUUID();
+        handler.registerDecommission(appId, Set.of("key1"));
+
+        handler.cleanupStaleDecommissions(Instant.now().plus(java.time.Duration.ofMinutes(5)));
+
+        assertThat(handler.isTracking(appId)).isTrue();
+        assertThat(loopStopper.stopped).isEmpty();
+    }
+
 
     // --- Recording stubs ---
 

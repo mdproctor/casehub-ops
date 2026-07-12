@@ -1,9 +1,9 @@
 package io.casehub.ops.api.infra;
 
-import java.util.Objects;
-
 import io.casehub.ops.api.infra.types.Labels;
 import io.casehub.ops.api.infra.types.ServiceType;
+
+import java.util.Objects;
 
 public record K8sServiceSpec(
         String namespace,
@@ -11,13 +11,15 @@ public record K8sServiceSpec(
         int port,
         int targetPort,
         ServiceType serviceType,
-        Labels labels) implements InfraNodeSpec {
+        Labels labels,
+        Labels selector) implements InfraNodeSpec {
 
     public K8sServiceSpec {
         Objects.requireNonNull(namespace, "namespace");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(serviceType, "serviceType");
         Objects.requireNonNull(labels, "labels");
+        Objects.requireNonNull(selector, "selector");
     }
 
     @Override

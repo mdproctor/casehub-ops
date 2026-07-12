@@ -1,16 +1,9 @@
 package io.casehub.ops.app.service;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.ActualStateAdapterRouter;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.NodeType;
-import io.casehub.desiredstate.api.TransitionPlan;
 import io.casehub.desiredstate.api.TransitionResult;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.desiredstate.runtime.FaultPolicyEngine;
@@ -23,7 +16,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * Plain unit tests for ApplicationLifecycleService — active loop index and
@@ -117,6 +119,18 @@ class ApplicationLifecycleServiceLoopTest {
         Set<String> result = service.activeLoopKeysForApp(UUID.randomUUID());
         assertThat(result).isEmpty();
     }
+
+    @Test
+    void activeLoopKeysForAppHandlesColonInTenancyId() {
+        UUID   appId = UUID.randomUUID();
+        String key   = "org:team:tenant:" + appId + ":cluster-1";
+
+        service.trackLoopKey("cluster-1", key);
+
+        Set<String> result = service.activeLoopKeysForApp(appId);
+        assertThat(result).containsExactly(key);
+    }
+
 
     @Test
     void multipleAppsCanShareCluster() {

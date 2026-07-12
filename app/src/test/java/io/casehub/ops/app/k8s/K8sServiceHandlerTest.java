@@ -1,7 +1,5 @@
 package io.casehub.ops.app.k8s;
 
-import java.util.Map;
-
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.ops.api.infra.K8sServiceSpec;
 import io.casehub.ops.api.infra.types.Labels;
@@ -14,7 +12,9 @@ import io.fabric8.kubernetes.client.server.mock.KubernetesMockServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @EnableKubernetesMockClient(crud = true)
 class K8sServiceHandlerTest {
@@ -28,13 +28,14 @@ class K8sServiceHandlerTest {
     @BeforeEach
     void setUp() {
         client.resource(new NamespaceBuilder()
-                .withNewMetadata().withName("casehub").endMetadata().build())
-                .create();
+                                .withNewMetadata().withName("casehub").endMetadata().build())
+              .create();
 
         spec = new K8sServiceSpec(
                 "casehub", "inventory-svc", 80, 8080,
                 ServiceType.CLUSTER_IP,
-                Labels.of(Map.of("app", "inventory", "managed-by", "casehub-ops")));
+                Labels.of(Map.of("app", "inventory", "managed-by", "casehub-ops")),
+                Labels.of(Map.of("app", "inventory")));
     }
 
     @Test
@@ -53,6 +54,15 @@ class K8sServiceHandlerTest {
         assertThat(svc.getSpec().getPorts().get(0).getTargetPort().getIntVal()).isEqualTo(8080);
         assertThat(svc.getSpec().getSelector()).containsEntry("app", "inventory");
     }
+
+    @Test
+    void selectorUsesOnlyAppLabel() {
+        var svc = (Service) handler.toResource(spec);
+        assertThat(svc.getMetadata().getLabels()).containsEntry("managed-by", "casehub-ops");
+        assertThat(svc.getSpec().getSelector()).doesNotContainKey("managed-by");
+        assertThat(svc.getSpec().getSelector()).containsExactlyEntriesOf(Map.of("app", "inventory"));
+    }
+
 
     @Test
     void applyCreatesService() {

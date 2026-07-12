@@ -1,15 +1,7 @@
 package io.casehub.ops.api.infra;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.List;
-import java.util.Map;
-
-import org.junit.jupiter.api.Test;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import io.casehub.desiredstate.api.NodeSpec;
 import io.casehub.ops.api.infra.types.AnsibleExtraVars;
 import io.casehub.ops.api.infra.types.AnsibleInventory;
@@ -25,6 +17,12 @@ import io.casehub.ops.api.infra.types.ResourceRequirements;
 import io.casehub.ops.api.infra.types.ServiceType;
 import io.casehub.ops.api.infra.types.TerraformBackendConfig;
 import io.casehub.ops.api.infra.types.TerraformStateType;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class InfraNodeSpecTest {
 
@@ -168,7 +166,7 @@ class InfraNodeSpecTest {
     @Test
     void k8sServiceSpec_resourceType() {
         var spec = new K8sServiceSpec("default", "my-svc", 80, 8080,
-                ServiceType.LOAD_BALANCER, Labels.empty());
+                                      ServiceType.LOAD_BALANCER, Labels.empty(), Labels.empty());
 
         assertThat(spec.resourceType()).isEqualTo("k8s_service");
         assertThat(spec.serviceType()).isEqualTo(ServiceType.LOAD_BALANCER);

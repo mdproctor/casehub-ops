@@ -1,12 +1,5 @@
 package io.casehub.ops.app.service;
 
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.desiredstate.api.DesiredStateEventTypes;
 import io.casehub.desiredstate.api.ReconciliationCompletedData;
@@ -15,6 +8,13 @@ import io.cloudevents.CloudEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
+
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Detects when decommissioned applications have fully converged on an empty
@@ -49,6 +49,13 @@ public class DecommissionCompletionHandler {
 
     /** appId -> Set of composite keys still pending convergence */
     private final ConcurrentHashMap<UUID, Set<String>> tracking = new ConcurrentHashMap<>();
+    private static final long                          TIMEOUT_MINUTES = 10;
+
+    /**
+     * appId -> registration time for staleness detection
+     */
+    private final ConcurrentHashMap<UUID, java.time.Instant> registeredAt = new ConcurrentHashMap<>();
+
 
     @Inject
     ObjectMapper objectMapper;
@@ -78,8 +85,8 @@ public class DecommissionCompletionHandler {
     public void registerDecommission(UUID appId, Set<String> compositeKeys) {
         tracking.put(appId, ConcurrentHashMap.newKeySet());
         tracking.get(appId).addAll(compositeKeys);
-        LOG.fine(() -> "Registered decommission for app " + appId + " with " + compositeKeys.size() + " keys");
-    }
+        registeredAt.put(appId, java.time.Instant.now());
+        LOG.fine(() -> "Registered decommission for app " + appId + " with " + compositeKeys.size() + " keys");}
 
     /**
      * Cancels decommission tracking for an application. Called by deploy()
@@ -88,10 +95,10 @@ public class DecommissionCompletionHandler {
      */
     public void cancelDecommission(UUID appId) {
         Set<String> removed = tracking.remove(appId);
+        registeredAt.remove(appId);
         if (removed != null) {
             LOG.fine(() -> "Cancelled decommission tracking for app " + appId);
-        }
-    }
+        }}
 
     /**
      * CDI async observer for CloudEvents fired by ReconciliationLoop.
@@ -152,6 +159,31 @@ public class DecommissionCompletionHandler {
     public boolean isTracking(UUID appId) {
         return tracking.containsKey(appId);
     }
+
+    @io.quarkus.scheduler.Scheduled(every = "1m")
+    void cleanupStaleDecommissions() {
+        cleanupStaleDecommissions(java.time.Instant.now());
+    }
+
+    void cleanupStaleDecommissions(java.time.Instant now) {
+        for (var entry : registeredAt.entrySet()) {
+            UUID              appId      = entry.getKey();
+            java.time.Instant registered = entry.getValue();
+            if (java.time.Duration.between(registered, now).toMinutes() >= TIMEOUT_MINUTES) {
+                Set<String> keys = tracking.remove(appId);
+                registeredAt.remove(appId);
+                if (keys != null) {
+                    for (String key : keys) {
+                        loopStopper.accept(key);
+                        keyRemover.accept(key);
+                    }
+                    statusTransitioner.accept(appId);
+                    LOG.warning("Decommission for app " + appId + " timed out after " + TIMEOUT_MINUTES + " minutes — force-stopping loops");
+                }
+            }
+        }
+    }
+
 
     /** Returns true if the composite key is tracked by any decommission entry. */
     private boolean isTrackedKey(String compositeKey) {

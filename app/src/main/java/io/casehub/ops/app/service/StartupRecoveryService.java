@@ -1,20 +1,6 @@
 package io.casehub.ops.app.service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.casehub.desiredstate.api.Dependency;
-import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.runtime.ReconciliationLoop;
@@ -25,10 +11,20 @@ import io.casehub.ops.app.k8s.K8sClientRegistry;
 import io.casehub.ops.app.model.ApplicationStatus;
 import io.casehub.ops.app.model.ServiceDefinition;
 import io.quarkus.runtime.StartupEvent;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Recovers active reconciliation state on application startup.
@@ -177,13 +173,8 @@ public class StartupRecoveryService {
     }
 
     private List<ServiceDefinition> parseServices(String json) {
-        try {
-            ObjectMapper mapper = objectMapper != null ? objectMapper : defaultMapper();
-            return mapper.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid services JSON", e);
-        }
-    }
+        ObjectMapper mapper = objectMapper != null ? objectMapper : defaultMapper();
+        return ServiceDefinitionParser.parse(json, mapper);}
 
     private static ObjectMapper defaultMapper() {
         ObjectMapper mapper = new ObjectMapper();

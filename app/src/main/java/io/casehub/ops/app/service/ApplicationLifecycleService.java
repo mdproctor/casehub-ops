@@ -1,13 +1,5 @@
 package io.casehub.ops.app.service;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.runtime.ReconciliationLoop;
@@ -23,6 +15,12 @@ import io.casehub.ops.app.model.ServiceDefinition;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class ApplicationLifecycleService {
@@ -148,19 +146,23 @@ public class ApplicationLifecycleService {
     }
 
     public Set<String> activeLoopKeysForApp(UUID appId) {
-        String appIdStr = appId.toString();
-        Set<String> result = ConcurrentHashMap.newKeySet();
+        String      appIdStr = appId.toString();
+        Set<String> result   = ConcurrentHashMap.newKeySet();
         for (Set<String> keys : activeLoops.values()) {
             for (String key : keys) {
                 // Composite key format: tenancyId:appId:clusterId
-                String[] parts = key.split(":");
-                if (parts.length >= 2 && parts[1].equals(appIdStr)) {
-                    result.add(key);
+                // appId and clusterId are UUIDs (no colons) — parse from the right
+                int lastColon       = key.lastIndexOf(':');
+                int secondLastColon = key.lastIndexOf(':', lastColon - 1);
+                if (secondLastColon >= 0) {
+                    String extractedAppId = key.substring(secondLastColon + 1, lastColon);
+                    if (extractedAppId.equals(appIdStr)) {
+                        result.add(key);
+                    }
                 }
             }
         }
-        return result;
-    }
+        return result;}
 
     // --- Internal methods ---
 
@@ -193,11 +195,5 @@ public class ApplicationLifecycleService {
         return record;
     }
 
-    private List<ServiceDefinition> parseServices(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid services JSON", e);
-        }
-    }
+    private List<ServiceDefinition> parseServices(String json) {return ServiceDefinitionParser.parse(json, objectMapper);}
 }

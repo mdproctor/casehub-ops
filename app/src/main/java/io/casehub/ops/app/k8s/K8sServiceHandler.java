@@ -1,7 +1,5 @@
 package io.casehub.ops.app.k8s;
 
-import java.util.Objects;
-
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.ops.api.infra.K8sServiceSpec;
 import io.casehub.ops.api.infra.types.ServiceType;
@@ -14,6 +12,8 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
 import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.Objects;
 
 @ApplicationScoped
 public class K8sServiceHandler implements K8sResourceHandler<K8sServiceSpec> {
@@ -28,22 +28,21 @@ public class K8sServiceHandler implements K8sResourceHandler<K8sServiceSpec> {
     @Override
     public HasMetadata toResource(K8sServiceSpec spec) {
         return new ServiceBuilder()
-                .withNewMetadata()
-                    .withName(spec.name())
-                    .withNamespace(spec.namespace())
-                    .withLabels(spec.labels().values())
-                .endMetadata()
-                .withNewSpec()
-                    .withType(toK8sServiceType(spec.serviceType()))
-                    .withSelector(spec.labels().values())
-                    .withPorts(new ServicePortBuilder()
-                            .withPort(spec.port())
-                            .withTargetPort(new IntOrString(spec.targetPort()))
-                            .withProtocol("TCP")
-                            .build())
-                .endSpec()
-                .build();
-    }
+                       .withNewMetadata()
+                       .withName(spec.name())
+                       .withNamespace(spec.namespace())
+                       .withLabels(spec.labels().values())
+                       .endMetadata()
+                       .withNewSpec()
+                       .withType(toK8sServiceType(spec.serviceType()))
+                       .withSelector(spec.selector().values())
+                       .withPorts(new ServicePortBuilder()
+                                          .withPort(spec.port())
+                                          .withTargetPort(new IntOrString(spec.targetPort()))
+                                          .withProtocol("TCP")
+                                          .build())
+                       .endSpec()
+                       .build();}
 
     @Override
     public NodeStatus readStatus(KubernetesClient client, K8sServiceSpec spec) {

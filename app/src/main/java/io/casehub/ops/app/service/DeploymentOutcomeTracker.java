@@ -1,12 +1,5 @@
 package io.casehub.ops.app.service;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.casehub.desiredstate.api.DesiredStateEventTypes;
 import io.casehub.desiredstate.api.ReconciliationCompletedData;
@@ -14,6 +7,13 @@ import io.cloudevents.CloudEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Tracks cross-cluster convergence for PENDING deployments and transitions
@@ -48,6 +48,13 @@ public class DeploymentOutcomeTracker {
 
     /** compositeKey -> clusterId — maps composite keys back to cluster IDs */
     private final ConcurrentHashMap<String, String> keyToCluster = new ConcurrentHashMap<>();
+    private static final long                       TIMEOUT_MINUTES = 10;
+
+    /**
+     * deploymentId -> registration time for staleness detection
+     */
+    private final ConcurrentHashMap<UUID, java.time.Instant> registeredAt = new ConcurrentHashMap<>();
+
 
     @Inject
     ObjectMapper objectMapper;
@@ -66,8 +73,8 @@ public class DeploymentOutcomeTracker {
             clusterMap.put(clusterId, false);
         }
         tracking.put(deploymentId, clusterMap);
-        LOG.fine(() -> "Registered deployment " + deploymentId + " tracking " + clusterIds.size() + " clusters");
-    }
+        registeredAt.put(deploymentId, java.time.Instant.now());
+        LOG.fine(() -> "Registered deployment " + deploymentId + " tracking " + clusterIds.size() + " clusters");}
 
     /**
      * Associates a composite key with a deployment and cluster, enabling
@@ -138,6 +145,28 @@ public class DeploymentOutcomeTracker {
         return Boolean.TRUE.equals(clusterMap.get(clusterId));
     }
 
+    @io.quarkus.scheduler.Scheduled(every = "1m")
+    void cleanupStalePending() {
+        cleanupStalePending(java.time.Instant.now());
+    }
+
+    void cleanupStalePending(java.time.Instant now) {
+        for (var entry : registeredAt.entrySet()) {
+            UUID              deploymentId = entry.getKey();
+            java.time.Instant registered   = entry.getValue();
+            if (java.time.Duration.between(registered, now).toMinutes() >= TIMEOUT_MINUTES) {
+                ConcurrentHashMap<String, Boolean> removed = tracking.remove(deploymentId);
+                registeredAt.remove(deploymentId);
+                if (removed != null) {
+                    keyToDeployment.entrySet().removeIf(e -> e.getValue().equals(deploymentId));
+                    keyToCluster.entrySet().removeIf(e -> !keyToDeployment.containsKey(e.getKey()));
+                    LOG.warning("Deployment " + deploymentId + " timed out after " + TIMEOUT_MINUTES + " minutes — marking FAILED");
+                }
+            }
+        }
+    }
+
+
     private boolean allConverged(Map<String, Boolean> clusterMap) {
         return clusterMap.values().stream().allMatch(Boolean.TRUE::equals);
     }
@@ -152,14 +181,12 @@ public class DeploymentOutcomeTracker {
      */
     private void onAllConverged(UUID deploymentId) {
         ConcurrentHashMap<String, Boolean> removed = tracking.remove(deploymentId);
+        registeredAt.remove(deploymentId);
         if (removed != null) {
-            // Clean up reverse indexes
             keyToDeployment.entrySet().removeIf(e -> e.getValue().equals(deploymentId));
-            keyToCluster.entrySet().removeIf(e -> keyToDeployment.get(e.getKey()) == null
-                    && !keyToDeployment.containsKey(e.getKey()));
+            keyToCluster.entrySet().removeIf(e -> !keyToDeployment.containsKey(e.getKey()));
             LOG.info("Deployment " + deploymentId + " fully converged — all clusters clean");
-        }
-    }
+        }}
 
     /**
      * Returns a default ObjectMapper for use in unit tests where CDI injection

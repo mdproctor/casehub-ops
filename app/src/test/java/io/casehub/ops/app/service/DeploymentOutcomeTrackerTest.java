@@ -1,11 +1,5 @@
 package io.casehub.ops.app.service;
 
-import java.net.URI;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.Set;
-import java.util.UUID;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.casehub.desiredstate.api.DesiredStateEventTypes;
@@ -15,7 +9,14 @@ import io.cloudevents.core.builder.CloudEventBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /**
  * Plain unit tests for DeploymentOutcomeTracker.
@@ -160,6 +161,28 @@ class DeploymentOutcomeTrackerTest {
         // Second event for same key — should not error
         assertThatNoException().isThrownBy(() -> tracker.onCloudEvent(event));
     }
+
+    @Test
+    void cleanupStalePendingRemovesTimedOutDeployments() {
+        var deploymentId = UUID.randomUUID();
+        tracker.registerDeployment(deploymentId, Set.of("c1"));
+        tracker.associateKey(deploymentId, "c1", "key:c1");
+
+        tracker.cleanupStalePending(Instant.now().plus(java.time.Duration.ofMinutes(11)));
+
+        assertThat(tracker.isTracking(deploymentId)).isFalse();
+    }
+
+    @Test
+    void cleanupStalePendingKeepsRecentDeployments() {
+        var deploymentId = UUID.randomUUID();
+        tracker.registerDeployment(deploymentId, Set.of("c1"));
+
+        tracker.cleanupStalePending(Instant.now().plus(java.time.Duration.ofMinutes(5)));
+
+        assertThat(tracker.isTracking(deploymentId)).isTrue();
+    }
+
 
     private CloudEvent buildCompletedEvent(String tenancyId,
                                             int additionsCount,

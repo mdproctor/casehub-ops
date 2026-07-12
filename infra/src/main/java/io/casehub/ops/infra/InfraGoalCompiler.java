@@ -1,15 +1,6 @@
 package io.casehub.ops.infra;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
 import com.fasterxml.jackson.databind.JsonNode;
-
 import io.casehub.desiredstate.api.CompilationResult;
 import io.casehub.desiredstate.api.Dependency;
 import io.casehub.desiredstate.api.DesiredNode;
@@ -45,6 +36,13 @@ import io.casehub.ops.api.infra.types.ResourceRequirements;
 import io.casehub.ops.api.infra.types.ServiceType;
 import io.casehub.ops.api.infra.types.TerraformBackendConfig;
 import io.casehub.ops.api.infra.types.TerraformStateType;
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Compiles {@link InfraGoals} into a {@link DesiredStateGraph}.
@@ -160,16 +158,16 @@ public class InfraGoalCompiler implements GoalCompiler<InfraGoals> {
     }
 
     private K8sServiceSpec parseK8sService(JsonNode config) {
-        String namespace = requireText(config, "namespace", "k8s_service");
-        String name = requireText(config, "name", "k8s_service");
-        int port = config.has("port") ? config.get("port").asInt() : 80;
-        int targetPort = config.has("targetPort") ? config.get("targetPort").asInt() : port;
+        String namespace  = requireText(config, "namespace", "k8s_service");
+        String name       = requireText(config, "name", "k8s_service");
+        int    port       = config.has("port") ? config.get("port").asInt() : 80;
+        int    targetPort = config.has("targetPort") ? config.get("targetPort").asInt() : port;
         ServiceType serviceType = config.has("serviceType")
-                ? ServiceType.valueOf(config.get("serviceType").asText())
-                : ServiceType.CLUSTER_IP;
-        Labels labels = parseLabels(config.get("labels"));
-        return new K8sServiceSpec(namespace, name, port, targetPort, serviceType, labels);
-    }
+                                  ? ServiceType.valueOf(config.get("serviceType").asText())
+                                  : ServiceType.CLUSTER_IP;
+        Labels labels   = parseLabels(config.get("labels"));
+        Labels selector = config.has("selector") ? parseLabels(config.get("selector")) : labels;
+        return new K8sServiceSpec(namespace, name, port, targetPort, serviceType, labels, selector);}
 
     private K8sIngressSpec parseK8sIngress(JsonNode config) {
         String namespace = requireText(config, "namespace", "k8s_ingress");
