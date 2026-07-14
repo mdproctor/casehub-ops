@@ -5,6 +5,9 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.KubernetesClientException;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -13,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class K8sClientRegistryTest {
 
@@ -286,5 +290,75 @@ class K8sClientRegistryTest {
         java.util.concurrent.CompletableFuture.allOf(first, second).join();
 
         assertThat(resolveCount.get()).isEqualTo(countAfterRegister + 1);
+    }
+
+    @Test
+    void withRetryOn401ReturnsResultOnSuccess() {
+        registry = new K8sClientRegistry(ref -> Map.of());
+        registry.register("c1", "https://localhost:6443");
+
+        String result = registry.withRetryOn401("c1", client -> "ok");
+
+        assertThat(result).isEqualTo("ok");
+    }
+
+    @Test
+    void withRetryOn401RefreshesAndRetriesOn401() {
+        AtomicInteger callCount = new AtomicInteger();
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            resolveCount.incrementAndGet();
+            return Map.of("bearer-token", "tok-" + resolveCount.get());
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+
+        String result = registry.withRetryOn401("c1", client -> {
+            if (callCount.getAndIncrement() == 0) {
+                throw new KubernetesClientException("Unauthorized", 401, null);
+            }
+            return "retried-ok";
+        });
+
+        assertThat(result).isEqualTo("retried-ok");
+        assertThat(callCount.get()).isEqualTo(2);
+        assertThat(resolveCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void withRetryOn401PropagatesNon401KubernetesClientException() {
+        registry = new K8sClientRegistry(ref -> Map.of());
+        registry.register("c1", "https://localhost:6443");
+
+        assertThatThrownBy(() -> registry.withRetryOn401("c1", client -> {
+            throw new KubernetesClientException("Forbidden", 403, null);
+        })).isInstanceOf(KubernetesClientException.class)
+           .hasMessageContaining("Forbidden");
+    }
+
+    @Test
+    void withRetryOn401PropagatesNonK8sExceptions() {
+        registry = new K8sClientRegistry(ref -> Map.of());
+        registry.register("c1", "https://localhost:6443");
+
+        assertThatThrownBy(() -> registry.withRetryOn401("c1", client -> {
+            throw new IllegalStateException("something else");
+        })).isInstanceOf(IllegalStateException.class)
+           .hasMessageContaining("something else");
+    }
+
+    @Test
+    void withRetryOn401PropagatesSecondFailure() {
+        AtomicInteger callCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> Map.of("bearer-token", "tok");
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+
+        assertThatThrownBy(() -> registry.withRetryOn401("c1", client -> {
+            callCount.incrementAndGet();
+            throw new KubernetesClientException("Unauthorized", 401, null);
+        })).isInstanceOf(KubernetesClientException.class);
+
+        assertThat(callCount.get()).isEqualTo(2);
     }
 }

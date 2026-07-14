@@ -37,6 +37,20 @@ public class K8sClientRegistry {
         return entry.client();
     }
 
+    public <T> T withRetryOn401(String clusterId, java.util.function.Function<KubernetesClient, T> operation) {
+        try {
+            return operation.apply(clientFor(clusterId));
+        } catch (io.fabric8.kubernetes.client.KubernetesClientException e) {
+            if (e.getCode() == 401) {
+                LOG.info("Received 401 for cluster " + clusterId + " — refreshing credentials and retrying");
+                refreshClient(clusterId);
+                return operation.apply(clientFor(clusterId));
+            }
+            throw e;
+        }
+    }
+
+
     public void register(String clusterId, String apiUrl) {
         register(clusterId, apiUrl, null, true);
     }

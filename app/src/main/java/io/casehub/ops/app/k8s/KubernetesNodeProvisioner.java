@@ -1,8 +1,5 @@
 package io.casehub.ops.app.k8s;
 
-import java.time.Duration;
-import java.util.Set;
-
 import io.casehub.desiredstate.api.DeprovisionContext;
 import io.casehub.desiredstate.api.DeprovisionResult;
 import io.casehub.desiredstate.api.DesiredNode;
@@ -16,17 +13,20 @@ import io.casehub.ops.app.goal.ApplicationNodeTypes;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.time.Duration;
+import java.util.Set;
+
 @ApplicationScoped
 public class KubernetesNodeProvisioner implements NodeProvisioner {
 
     private final K8sHandlerRegistry handlerRegistry;
-    private final K8sClientRegistry clientRegistry;
+    private final K8sClientRegistry  clientRegistry;
 
     @Inject
     public KubernetesNodeProvisioner(K8sHandlerRegistry handlerRegistry,
-                                      K8sClientRegistry clientRegistry) {
+                                     K8sClientRegistry clientRegistry) {
         this.handlerRegistry = handlerRegistry;
-        this.clientRegistry = clientRegistry;
+        this.clientRegistry  = clientRegistry;
     }
 
     @Override
@@ -45,17 +45,19 @@ public class KubernetesNodeProvisioner implements NodeProvisioner {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {
         if (!(node.spec() instanceof InfraDesiredNodeSpec wrapper)) {
             return new ProvisionResult.Failed("spec is not InfraDesiredNodeSpec");
         }
         try {
-            String clusterId = KubernetesActualStateAdapter.extractClusterId(wrapper.backendId());
-            var client = clientRegistry.clientFor(clusterId);
+            String        clusterId    = KubernetesActualStateAdapter.extractClusterId(wrapper.backendId());
             InfraNodeSpec resourceSpec = wrapper.resourceSpec();
+            @SuppressWarnings("unchecked")
             var handler = (K8sResourceHandler<InfraNodeSpec>) handlerRegistry.handlerFor(resourceSpec.getClass());
-            handler.apply(client, resourceSpec);
+            clientRegistry.withRetryOn401(clusterId, client -> {
+                handler.apply(client, resourceSpec);
+                return null;
+            });
             return new ProvisionResult.Success();
         } catch (Exception e) {
             return new ProvisionResult.Failed(e.getMessage());
@@ -63,17 +65,19 @@ public class KubernetesNodeProvisioner implements NodeProvisioner {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public DeprovisionResult deprovision(DesiredNode node, DeprovisionContext context) {
         if (!(node.spec() instanceof InfraDesiredNodeSpec wrapper)) {
             return new DeprovisionResult.Failed("spec is not InfraDesiredNodeSpec");
         }
         try {
-            String clusterId = KubernetesActualStateAdapter.extractClusterId(wrapper.backendId());
-            var client = clientRegistry.clientFor(clusterId);
+            String        clusterId    = KubernetesActualStateAdapter.extractClusterId(wrapper.backendId());
             InfraNodeSpec resourceSpec = wrapper.resourceSpec();
+            @SuppressWarnings("unchecked")
             var handler = (K8sResourceHandler<InfraNodeSpec>) handlerRegistry.handlerFor(resourceSpec.getClass());
-            handler.delete(client, resourceSpec);
+            clientRegistry.withRetryOn401(clusterId, client -> {
+                handler.delete(client, resourceSpec);
+                return null;
+            });
             return new DeprovisionResult.Success();
         } catch (Exception e) {
             return new DeprovisionResult.Failed(e.getMessage());

@@ -18,6 +18,8 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import org.junit.jupiter.api.Test;
 
+import io.fabric8.kubernetes.client.KubernetesClientException;
+
 import static org.assertj.core.api.Assertions.*;
 
 class KubernetesActualStateAdapterTest {
@@ -100,5 +102,35 @@ class KubernetesActualStateAdapterTest {
         public void delete(KubernetesClient client, K8sNamespaceSpec spec) {
             deleteCalled = true;
         }
+    }
+
+    @Test
+    void readActualRetriesOn401AfterCredentialRefresh() {
+        var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
+        var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
+        var nodeId = NodeId.of("ops-prod:namespace");
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var graph = graphFactory.of(List.of(node), List.of());
+
+        java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
+        var handler = new StubNamespaceHandler(NodeStatus.PRESENT) {
+            @Override
+            public NodeStatus readStatus(KubernetesClient client, K8sNamespaceSpec spec) {
+                if (callCount.getAndIncrement() == 0) {
+                    throw new KubernetesClientException("Unauthorized", 401, null);
+                }
+                readStatusCalled = true;
+                return NodeStatus.PRESENT;
+            }
+        };
+        var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
+        clientRegistry.register("ops-prod", "https://localhost:6443");
+
+        var adapter = new KubernetesActualStateAdapter(handlerRegistry, clientRegistry);
+        var actual = adapter.readActual(graph, "default");
+
+        assertThat(actual.statusOf(nodeId)).contains(NodeStatus.PRESENT);
+        assertThat(callCount.get()).isEqualTo(2);
     }
 }

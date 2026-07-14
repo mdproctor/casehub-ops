@@ -20,6 +20,8 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import org.junit.jupiter.api.Test;
 
+import io.fabric8.kubernetes.client.KubernetesClientException;
+
 import static org.assertj.core.api.Assertions.*;
 
 class KubernetesNodeProvisionerTest {
@@ -139,5 +141,65 @@ class KubernetesNodeProvisionerTest {
         public void delete(KubernetesClient client, K8sNamespaceSpec spec) {
             deleteCalled = true;
         }
+    }
+
+    @Test
+    void provisionRetriesOn401AfterCredentialRefresh() {
+        var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
+        var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
+        var nodeId = NodeId.of("ops-prod:namespace");
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var graph = graphFactory.of(List.of(node), List.of());
+
+        java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
+        var handler = new StubHandler(NodeStatus.PRESENT) {
+            @Override
+            public void apply(KubernetesClient client, K8sNamespaceSpec spec) {
+                if (callCount.getAndIncrement() == 0) {
+                    throw new KubernetesClientException("Unauthorized", 401, null);
+                }
+                applyCalled = true;
+            }
+        };
+        var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
+        clientRegistry.register("ops-prod", "https://localhost:6443");
+
+        var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
+        var context = new ProvisionContext("default", graph);
+
+        ProvisionResult result = provisioner.provision(node, context);
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+        assertThat(callCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void deprovisionRetriesOn401AfterCredentialRefresh() {
+        var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
+        var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
+        var nodeId = NodeId.of("ops-prod:namespace");
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var graph = graphFactory.of(List.of(node), List.of());
+
+        java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
+        var handler = new StubHandler(NodeStatus.PRESENT) {
+            @Override
+            public void delete(KubernetesClient client, K8sNamespaceSpec spec) {
+                if (callCount.getAndIncrement() == 0) {
+                    throw new KubernetesClientException("Unauthorized", 401, null);
+                }
+                deleteCalled = true;
+            }
+        };
+        var handlerRegistry = new K8sHandlerRegistry(List.of(handler));
+        var clientRegistry = new K8sClientRegistry(ref -> Map.of());
+        clientRegistry.register("ops-prod", "https://localhost:6443");
+
+        var provisioner = new KubernetesNodeProvisioner(handlerRegistry, clientRegistry);
+        var context = new DeprovisionContext("default", graph);
+
+        DeprovisionResult result = provisioner.deprovision(node, context);
+        assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+        assertThat(callCount.get()).isEqualTo(2);
     }
 }
