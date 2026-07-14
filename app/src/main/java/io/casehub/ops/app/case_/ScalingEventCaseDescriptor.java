@@ -92,26 +92,36 @@ public final class ScalingEventCaseDescriptor {
             return WorkerResult.failed("serviceId is required");
         }
 
-        Number targetReplicasNum = (Number) input.get("targetReplicas");
+        Number targetReplicasNum  = (Number) input.get("targetReplicas");
         Number currentReplicasNum = (Number) input.get("currentReplicas");
         if (targetReplicasNum == null) {
             return WorkerResult.failed("targetReplicas is required");
         }
-        int targetReplicas = targetReplicasNum.intValue();
+        int targetReplicas  = targetReplicasNum.intValue();
         int currentReplicas = currentReplicasNum != null ? currentReplicasNum.intValue() : 0;
 
         if (targetReplicas <= 0) {
             return WorkerResult.failed("targetReplicas must be > 0, got: " + targetReplicas);
         }
 
+        ScalingPolicy policy = buildPolicy(input);
+
+        String            lastScalingTs    = (String) input.get("lastScalingTimestamp");
+        java.time.Instant lastScalingEvent = lastScalingTs != null ? java.time.Instant.parse(lastScalingTs) : null;
+        if (policy.isCoolingDown(lastScalingEvent, java.time.Instant.now())) {
+            return WorkerResult.of(Map.of("scalingStatus", "cooling-down"));
+        }
+
+        targetReplicas = policy.clamp(targetReplicas);
+
         if (targetReplicas == currentReplicas) {
             return WorkerResult.of(Map.of("scalingStatus", "no-change-needed"));
         }
 
-        String action = targetReplicas > currentReplicas ? "scale-up" : "scale-down";
+        String action        = targetReplicas > currentReplicas ? "scale-up" : "scale-down";
         String applicationId = (String) input.get("applicationId");
-        String tenancyId = (String) input.get("tenancyId");
-        String reason = (String) input.getOrDefault("reason", "unspecified");
+        String tenancyId     = (String) input.get("tenancyId");
+        String reason        = (String) input.getOrDefault("reason", "unspecified");
 
         var decision = new LinkedHashMap<String, Object>();
         decision.put("action", action);
@@ -122,8 +132,24 @@ public final class ScalingEventCaseDescriptor {
         decision.put("currentReplicas", currentReplicas);
         decision.put("reason", reason);
 
-        return WorkerResult.of(Map.of("scalingDecision", decision));
+        return WorkerResult.of(Map.of("scalingDecision", decision));}
+
+    private static ScalingPolicy buildPolicy(Map<String, Object> input) {
+        Number minNum      = (Number) input.get("minReplicas");
+        Number maxNum      = (Number) input.get("maxReplicas");
+        Number cooldownNum = (Number) input.get("cooldownSeconds");
+
+        if (minNum == null && maxNum == null && cooldownNum == null) {
+            return ScalingPolicy.UNBOUNDED;
+        }
+
+        int min = minNum != null ? minNum.intValue() : 0;
+        int max = maxNum != null ? maxNum.intValue() : Integer.MAX_VALUE;
+        java.time.Duration cooldown = cooldownNum != null
+                                      ? java.time.Duration.ofSeconds(cooldownNum.longValue()) : null;
+        return new ScalingPolicy(min, max, cooldown);
     }
+
 
     @SuppressWarnings("unchecked")
     static WorkerResult executeScaling(Map<String, Object> input,

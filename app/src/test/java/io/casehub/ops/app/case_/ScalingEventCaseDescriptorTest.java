@@ -189,6 +189,107 @@ class ScalingEventCaseDescriptorTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void evaluateClampsTooHighTarget() {
+        var input = new java.util.HashMap<String, Object>();
+        input.put("applicationId", UUID.randomUUID().toString());
+        input.put("tenancyId", "tenant-1");
+        input.put("serviceId", "order-processor");
+        input.put("currentReplicas", 3);
+        input.put("targetReplicas", 100);
+        input.put("maxReplicas", 10);
+        input.put("minReplicas", 1);
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        Map<String, Object> decision = (Map<String, Object>) result.output().get("scalingDecision");
+        assertThat(decision.get("validatedTarget")).isEqualTo(10);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void evaluateClampsTooLowTarget() {
+        var input = new java.util.HashMap<String, Object>();
+        input.put("applicationId", UUID.randomUUID().toString());
+        input.put("tenancyId", "tenant-1");
+        input.put("serviceId", "order-processor");
+        input.put("currentReplicas", 5);
+        input.put("targetReplicas", 1);
+        input.put("minReplicas", 3);
+        input.put("maxReplicas", 20);
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        Map<String, Object> decision = (Map<String, Object>) result.output().get("scalingDecision");
+        assertThat(decision.get("validatedTarget")).isEqualTo(3);
+    }
+
+    @Test
+    void evaluateNoChangeAfterClamping() {
+        var input = new java.util.HashMap<String, Object>();
+        input.put("applicationId", UUID.randomUUID().toString());
+        input.put("tenancyId", "tenant-1");
+        input.put("serviceId", "order-processor");
+        input.put("currentReplicas", 5);
+        input.put("targetReplicas", 10);
+        input.put("maxReplicas", 5);
+        input.put("minReplicas", 1);
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        assertThat(result.output()).containsEntry("scalingStatus", "no-change-needed");
+    }
+
+    @Test
+    void evaluateCoolingDownRejectsScaling() {
+        var input = new java.util.HashMap<String, Object>();
+        input.put("applicationId", UUID.randomUUID().toString());
+        input.put("tenancyId", "tenant-1");
+        input.put("serviceId", "order-processor");
+        input.put("currentReplicas", 3);
+        input.put("targetReplicas", 6);
+        input.put("cooldownSeconds", 300);
+        input.put("lastScalingTimestamp", java.time.Instant.now().minus(java.time.Duration.ofSeconds(60)).toString());
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        assertThat(result.output()).containsEntry("scalingStatus", "cooling-down");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void evaluateWithoutPolicyFieldsUsesDefaults() {
+        var input = Map.<String, Object>of(
+                "applicationId", UUID.randomUUID().toString(),
+                "tenancyId", "tenant-1",
+                "serviceId", "order-processor",
+                "currentReplicas", 3,
+                "targetReplicas", 6,
+                "reason", "test");
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        Map<String, Object> decision = (Map<String, Object>) result.output().get("scalingDecision");
+        assertThat(decision.get("validatedTarget")).isEqualTo(6);
+    }
+
+    @Test
+    void evaluateAfterCooldownAllowsScaling() {
+        var input = new java.util.HashMap<String, Object>();
+        input.put("applicationId", UUID.randomUUID().toString());
+        input.put("tenancyId", "tenant-1");
+        input.put("serviceId", "order-processor");
+        input.put("currentReplicas", 3);
+        input.put("targetReplicas", 6);
+        input.put("cooldownSeconds", 60);
+        input.put("lastScalingTimestamp", java.time.Instant.now().minus(java.time.Duration.ofSeconds(120)).toString());
+
+        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
+
+        assertThat(result.output()).containsKey("scalingDecision");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void executeOutputsAuditTrailWithNodeIds() {
         java.util.Set<String> returnedNodeIds = java.util.Set.of("cluster-1:order-processor:deployment");
         io.casehub.ops.app.service.ApplicationLifecycleService mockService =
