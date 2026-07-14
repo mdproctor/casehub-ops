@@ -12,7 +12,9 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
@@ -70,15 +72,26 @@ public class K8sWatchManager {
         LOG.info("Started watching " + watchKey + " — 4 resource types");
     }
 
-    public void stopWatching(String clusterId) {
+    public Set<String> stopWatching(String clusterId) {
+        Set<String> namespaces = new HashSet<>();
         activeWatches.entrySet().removeIf(entry -> {
             if (entry.getKey().startsWith(clusterId + ":")) {
+                namespaces.add(entry.getKey().substring(clusterId.length() + 1));
                 entry.getValue().forEach(Watch::close);
                 return true;
             }
             return false;
         });
+        return namespaces;
     }
+
+    void onCredentialRefreshed(@jakarta.enterprise.event.Observes CredentialRefreshedEvent event) {
+        Set<String> namespaces = stopWatching(event.clusterId());
+        for (String namespace : namespaces) {
+            startWatching(event.clusterId(), namespace);
+        }
+    }
+
 
     public boolean isWatching(String clusterId, String namespace) {
         return activeWatches.containsKey(clusterId + ":" + namespace);

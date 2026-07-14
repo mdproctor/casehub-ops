@@ -1,9 +1,5 @@
 package io.casehub.ops.app.k8s;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
-
 import io.casehub.platform.api.credentials.CredentialResolver;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.ConfigBuilder;
@@ -13,13 +9,20 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
+
 @ApplicationScoped
 public class K8sClientRegistry {
+    private static final Logger                                 LOG     = Logger.getLogger(K8sClientRegistry.class.getName());
+    private final        ConcurrentHashMap<String, ClientEntry> clients = new ConcurrentHashMap<>();
+    private final        CredentialResolver                     credentialResolver;
+    private final        ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<Void>> refreshesInFlight = new ConcurrentHashMap<>();
+    @Inject
+    jakarta.enterprise.event.Event<CredentialRefreshedEvent> credentialRefreshedEvent;
 
-    private static final Logger LOG = Logger.getLogger(K8sClientRegistry.class.getName());
-
-    private final ConcurrentHashMap<String, KubernetesClient> clients = new ConcurrentHashMap<>();
-    private final CredentialResolver                          credentialResolver;
 
     @Inject
     public K8sClientRegistry(CredentialResolver credentialResolver) {
@@ -27,11 +30,11 @@ public class K8sClientRegistry {
     }
 
     public KubernetesClient clientFor(String clusterId) {
-        KubernetesClient client = clients.get(clusterId);
-        if (client == null) {
+        ClientEntry entry = clients.get(clusterId);
+        if (entry == null) {
             throw new IllegalArgumentException("No client registered for cluster: " + clusterId);
         }
-        return client;
+        return entry.client();
     }
 
     public void register(String clusterId, String apiUrl) {
@@ -39,28 +42,35 @@ public class K8sClientRegistry {
     }
 
     public void register(String clusterId, String apiUrl, String credentialRef, boolean trustCerts) {
-        Config config = new ConfigBuilder()
-                                .withMasterUrl(apiUrl)
-                                .withTrustCerts(trustCerts)
-                                .build();
-
+        Map<String, String> creds = Map.of();
         if (credentialRef != null && !credentialRef.isBlank()) {
-            Map<String, String> creds = credentialResolver.resolve(credentialRef);
+            creds = credentialResolver.resolve(credentialRef);
             if (creds.isEmpty()) {
                 LOG.warning("Credential reference '" + credentialRef
                             + "' resolved to empty map — possible misconfiguration. Falling back to auto-detection.");
-            } else {
-                applyCredentials(config, creds);
             }
         }
 
-        KubernetesClient client = new KubernetesClientBuilder()
-                                          .withConfig(config)
-                                          .build();
-        KubernetesClient existing = clients.putIfAbsent(clusterId, client);
-        if (existing != null) {
-            client.close();
-        }
+        String  expiresAtStr = creds.get("expires-at");
+        Instant expiresAt    = expiresAtStr != null ? Instant.parse(expiresAtStr) : null;
+
+        Map<String, String> finalCreds = creds;
+        clients.compute(clusterId, (id, existing) -> {
+            if (existing != null) {
+                return new ClientEntry(existing.client(), apiUrl, credentialRef, trustCerts, expiresAt);
+            }
+            Config config = new ConfigBuilder()
+                                    .withMasterUrl(apiUrl)
+                                    .withTrustCerts(trustCerts)
+                                    .build();
+            if (!finalCreds.isEmpty()) {
+                applyCredentials(config, finalCreds);
+            }
+            KubernetesClient client = new KubernetesClientBuilder()
+                                              .withConfig(config)
+                                              .build();
+            return new ClientEntry(client, apiUrl, credentialRef, trustCerts, expiresAt);
+        });
     }
 
     private void applyCredentials(Config config, Map<String, String> creds) {
@@ -82,16 +92,98 @@ public class K8sClientRegistry {
         }
     }
 
+
+    public void refreshClient(String clusterId) {
+        java.util.concurrent.CompletableFuture<Void> newFuture = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.CompletableFuture<Void> future = refreshesInFlight.putIfAbsent(clusterId, newFuture);
+
+        if (future == null) {
+            future = newFuture;
+            try {
+                doRefresh(clusterId);
+                newFuture.complete(null);
+            } catch (Exception e) {
+                newFuture.completeExceptionally(e);
+            } finally {
+                refreshesInFlight.remove(clusterId, newFuture);
+            }
+        }
+
+        try {
+            future.join();
+        } catch (java.util.concurrent.CompletionException e) {
+            if (e.getCause() instanceof RuntimeException re) {
+                throw re;
+            }
+            throw e;
+        }
+    }
+
+    private void doRefresh(String clusterId) {
+        ClientEntry existing = clients.get(clusterId);
+        if (existing == null) {
+            throw new IllegalArgumentException("No client registered for cluster: " + clusterId);
+        }
+
+        Map<String, String> creds        = credentialResolver.resolve(existing.credentialRef());
+        String              expiresAtStr = creds.get("expires-at");
+        Instant             newExpiresAt = expiresAtStr != null ? Instant.parse(expiresAtStr) : null;
+
+        Config config = new ConfigBuilder()
+                                .withMasterUrl(existing.apiUrl())
+                                .withTrustCerts(existing.trustCerts())
+                                .build();
+        if (!creds.isEmpty()) {
+            applyCredentials(config, creds);
+        }
+        KubernetesClient newClient = new KubernetesClientBuilder()
+                                             .withConfig(config)
+                                             .build();
+
+        ClientEntry newEntry = new ClientEntry(newClient, existing.apiUrl(), existing.credentialRef(),
+                                               existing.trustCerts(), newExpiresAt);
+        ClientEntry old = clients.put(clusterId, newEntry);
+
+        if (credentialRefreshedEvent != null) {
+            credentialRefreshedEvent.fire(new CredentialRefreshedEvent(clusterId));
+        }
+
+        if (old != null) {
+            old.client().close();
+        }
+    }
+
+    @io.quarkus.scheduler.Scheduled(every = "60s")
+    void checkExpiring() {
+        for (var entry : clients.entrySet()) {
+            try {
+                Instant expiresAt = entry.getValue().expiresAt();
+                if (expiresAt == null) {continue;}
+                java.time.Duration remaining = java.time.Duration.between(Instant.now(), expiresAt);
+                if (remaining.toMinutes() < 5) {
+                    LOG.info("Credential for cluster " + entry.getKey() + " expiring in "
+                             + remaining.toSeconds() + "s — refreshing");
+                    refreshClient(entry.getKey());
+                }
+            } catch (Exception e) {
+                LOG.warning("Failed to refresh credential for cluster " + entry.getKey() + ": " + e.getMessage());
+            }
+        }
+    }
+
     public void deregister(String clusterId) {
-        KubernetesClient client = clients.remove(clusterId);
-        if (client != null) {
-            client.close();
+        ClientEntry entry = clients.remove(clusterId);
+        if (entry != null) {
+            entry.client().close();
         }
     }
 
     @PreDestroy
     public void shutdown() {
-        clients.values().forEach(KubernetesClient::close);
+        clients.values().forEach(entry -> entry.client().close());
         clients.clear();
     }
+
+    record ClientEntry(KubernetesClient client, String apiUrl, String credentialRef,
+                       boolean trustCerts, Instant expiresAt) {}
 }

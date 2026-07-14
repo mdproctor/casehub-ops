@@ -16,35 +16,40 @@ import jakarta.enterprise.event.ObservesAsync;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
-public class DriftConvergenceHandler {
+public class NodeConvergenceTracker {
 
-    private static final Logger LOG = Logger.getLogger(DriftConvergenceHandler.class.getName());
+    private static final Logger LOG = Logger.getLogger(NodeConvergenceTracker.class.getName());
 
     @FunctionalInterface
     public interface ConvergenceSignaler {
         void signal(UUID caseId, String path, Object value);
     }
 
-    private final ConcurrentHashMap<UUID, Set<String>> pendingNodes = new ConcurrentHashMap<>();
+    record CaseTracking(Set<String> pendingNodeIds,
+                        String signalPath, Object signalValue) {}
+
+    private final ConcurrentHashMap<UUID, CaseTracking> tracked = new ConcurrentHashMap<>();
     private final ConvergenceSignaler signaler;
     private final ObjectMapper objectMapper;
 
     @Inject
-    public DriftConvergenceHandler(io.casehub.api.engine.CaseHubRuntime runtime, ObjectMapper objectMapper) {
+    public NodeConvergenceTracker(io.casehub.api.engine.CaseHubRuntime runtime, ObjectMapper objectMapper) {
         this.signaler = (caseId, path, value) -> runtime.signal(caseId, path, value);
         this.objectMapper = objectMapper;
     }
 
-    DriftConvergenceHandler(ConvergenceSignaler signaler, ObjectMapper objectMapper) {
+    public NodeConvergenceTracker(ConvergenceSignaler signaler, ObjectMapper objectMapper) {
         this.signaler = signaler;
         this.objectMapper = objectMapper;
     }
 
-    public void registerDriftCase(UUID childCaseId, Set<String> driftedNodeIds) {
+    public void register(UUID caseId, Set<String> nodeIds,
+                          String signalPath, Object signalValue) {
         var pending = ConcurrentHashMap.<String>newKeySet();
-        pending.addAll(driftedNodeIds);
-        pendingNodes.put(childCaseId, pending);
-        LOG.fine(() -> "Tracking drift convergence for case " + childCaseId + " with " + driftedNodeIds.size() + " nodes");
+        pending.addAll(nodeIds);
+        tracked.put(caseId, new CaseTracking(pending, signalPath, signalValue));
+        LOG.fine(() -> "Tracking convergence for case " + caseId + " with " + nodeIds.size()
+                       + " nodes, signal path: " + signalPath);
     }
 
     void onCloudEvent(@ObservesAsync CloudEvent event) {
@@ -61,14 +66,14 @@ public class DriftConvergenceHandler {
 
         String recoveredNodeId = data.nodeId();
 
-        for (var entry : pendingNodes.entrySet()) {
+        for (var entry : tracked.entrySet()) {
             UUID caseId = entry.getKey();
-            Set<String> pending = entry.getValue();
-            if (pending.remove(recoveredNodeId) && pending.isEmpty()) {
-                pendingNodes.remove(caseId);
+            CaseTracking tracking = entry.getValue();
+            if (tracking.pendingNodeIds().remove(recoveredNodeId) && tracking.pendingNodeIds().isEmpty()) {
+                tracked.remove(caseId);
                 try {
-                    signaler.signal(caseId, "remediationStatus", Map.of("remediationStatus", "converged"));
-                    LOG.info("Drift case " + caseId + " converged — all nodes recovered");
+                    signaler.signal(caseId, tracking.signalPath(), tracking.signalValue());
+                    LOG.info("Case " + caseId + " converged — all nodes recovered, signaled " + tracking.signalPath());
                 } catch (Exception e) {
                     LOG.log(Level.WARNING, "Failed to signal convergence for case " + caseId, e);
                 }
@@ -77,6 +82,6 @@ public class DriftConvergenceHandler {
     }
 
     public boolean isTracking(UUID caseId) {
-        return pendingNodes.containsKey(caseId);
+        return tracked.containsKey(caseId);
     }
 }

@@ -18,7 +18,7 @@ class CaseDefinitionRegistrarTest {
     @Test
     void registersSevenCaseDefinitions() {
         var registry = new RecordingRegistry();
-        var registrar = new CaseDefinitionRegistrar(registry);
+        var registrar = new CaseDefinitionRegistrar(registry, new io.casehub.ops.app.service.NodeConvergenceTracker((caseId, path, value) -> {}, new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())), null);
 
         registrar.onStartup(null);
 
@@ -28,7 +28,7 @@ class CaseDefinitionRegistrarTest {
     @Test
     void registersApplicationLifecycleDefinition() {
         var registry = new RecordingRegistry();
-        var registrar = new CaseDefinitionRegistrar(registry);
+        var registrar = new CaseDefinitionRegistrar(registry, new io.casehub.ops.app.service.NodeConvergenceTracker((caseId, path, value) -> {}, new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())), null);
 
         registrar.onStartup(null);
 
@@ -39,7 +39,7 @@ class CaseDefinitionRegistrarTest {
     @Test
     void registersDriftRemediationDefinition() {
         var registry = new RecordingRegistry();
-        var registrar = new CaseDefinitionRegistrar(registry);
+        var registrar = new CaseDefinitionRegistrar(registry, new io.casehub.ops.app.service.NodeConvergenceTracker((caseId, path, value) -> {}, new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())), null);
 
         registrar.onStartup(null);
 
@@ -48,9 +48,9 @@ class CaseDefinitionRegistrarTest {
     }
 
     @Test
-    void registersFiveStubDefinitions() {
+    void registersFourStubDefinitions() {
         var registry = new RecordingRegistry();
-        var registrar = new CaseDefinitionRegistrar(registry);
+        var registrar = new CaseDefinitionRegistrar(registry, new io.casehub.ops.app.service.NodeConvergenceTracker((caseId, path, value) -> {}, new com.fasterxml.jackson.databind.ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())), null);
 
         registrar.onStartup(null);
 
@@ -60,7 +60,7 @@ class CaseDefinitionRegistrarTest {
                 .toList();
         assertThat(stubNames).containsExactlyInAnyOrder(
                 "cve-response", "service-upgrade", "incident-response",
-                "scaling-event", "compliance-remediation");
+                "compliance-remediation");
     }
 
     private static class RecordingRegistry implements CaseDefinitionRegistry {

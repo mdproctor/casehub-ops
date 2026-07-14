@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class DriftClassifyWorkerTest {
 
@@ -98,7 +98,7 @@ class DriftClassifyWorkerTest {
         var input = Map.<String, Object>of(
                 "driftClassification", Map.of("severity", "benign"));
 
-        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input);
+        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input, noopTracker());
         assertThat(result.output().get("remediationStatus")).isEqualTo("auto-remediating");
     }
 
@@ -107,7 +107,7 @@ class DriftClassifyWorkerTest {
         var input = Map.<String, Object>of(
                 "driftClassification", Map.of("severity", "critical"));
 
-        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input);
+        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input, noopTracker());
         assertThat(result.output().get("escalationRequired")).isEqualTo(true);
     }
 
@@ -115,7 +115,7 @@ class DriftClassifyWorkerTest {
     void remediateWorkerNullClassificationDefaultsBenign() {
         var input = Map.<String, Object>of();
 
-        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input);
+        WorkerResult result = DriftRemediationCaseDescriptor.remediateDrift(input, noopTracker());
         assertThat(result.output().get("remediationStatus")).isEqualTo("auto-remediating");
     }
 
@@ -144,5 +144,12 @@ class DriftClassifyWorkerTest {
         var escalation = (Map<String, Object>) result.output().get("escalation");
         assertThat(escalation).isNotNull();
         assertThat(escalation.get("risk")).isEqualTo("HIGH");
+    }
+
+    private static io.casehub.ops.app.service.NodeConvergenceTracker noopTracker() {
+        return new io.casehub.ops.app.service.NodeConvergenceTracker(
+                (caseId, path, value) -> {},
+                new com.fasterxml.jackson.databind.ObjectMapper()
+                        .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
     }
 }

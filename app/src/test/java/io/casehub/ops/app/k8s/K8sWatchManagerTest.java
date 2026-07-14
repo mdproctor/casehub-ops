@@ -1,14 +1,8 @@
 package io.casehub.ops.app.k8s;
 
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.NodeStatus;
 import io.casehub.desiredstate.api.StateEvent;
-import io.casehub.platform.api.credentials.CredentialResolver;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.api.model.NamespaceBuilder;
 import io.fabric8.kubernetes.api.model.ServiceBuilder;
@@ -19,6 +13,9 @@ import io.fabric8.kubernetes.client.server.mock.KubernetesMockServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -218,6 +215,37 @@ class K8sWatchManagerTest {
         assertThat(eventSource.events).hasSize(2);
         assertThat(eventSource.events.get(1).newStatus()).isEqualTo(NodeStatus.ABSENT);
     }
+
+    @Test
+    void stopWatchingReturnsNamespaces() {
+        watchManager.startWatching("cluster-1", "casehub");
+        client.resource(new NamespaceBuilder()
+                                .withNewMetadata().withName("staging").endMetadata().build()).create();
+        watchManager.startWatching("cluster-1", "staging");
+
+        java.util.Set<String> namespaces = watchManager.stopWatching("cluster-1");
+
+        assertThat(namespaces).containsExactlyInAnyOrder("casehub", "staging");
+        assertThat(watchManager.activeWatchCount()).isEqualTo(0);
+    }
+
+    @Test
+    void credentialRefreshRestartsWatches() throws Exception {
+        watchManager.startWatching("cluster-1", "casehub");
+        assertThat(watchManager.isWatching("cluster-1", "casehub")).isTrue();
+
+        watchManager.onCredentialRefreshed(new CredentialRefreshedEvent("cluster-1"));
+
+        assertThat(watchManager.isWatching("cluster-1", "casehub")).isTrue();
+        assertThat(watchManager.activeWatchCount()).isEqualTo(1);
+    }
+
+    @Test
+    void credentialRefreshForUnwatchedClusterIsNoOp() {
+        watchManager.onCredentialRefreshed(new CredentialRefreshedEvent("unknown-cluster"));
+        assertThat(watchManager.activeWatchCount()).isEqualTo(0);
+    }
+
 
     static class RecordingEventSource extends KubernetesEventSource {
         final CopyOnWriteArrayList<StateEvent> events = new CopyOnWriteArrayList<>();

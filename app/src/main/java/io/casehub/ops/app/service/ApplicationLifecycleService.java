@@ -25,45 +25,38 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApplicationScoped
 public class ApplicationLifecycleService {
 
+    /**
+     * Active loop index: clusterId -> Set of composite keys
+     */
+    private final ConcurrentHashMap<String, Set<String>> activeLoops = new ConcurrentHashMap<>();
     @Inject
     ApplicationGoalCompiler goalCompiler;
-
     @Inject
     DesiredStateGraphFactory graphFactory;
-
     @Inject
     ObjectMapper objectMapper;
-
     @Inject
     ClusterService clusterService;
-
     @Inject
     ReconciliationLoop reconciliationLoop;
-
     @Inject
     K8sClientRegistry clientRegistry;
-
     @Inject
     DecommissionCompletionHandler decommissionHandler;
-
     @Inject
-    DeploymentOutcomeTracker deploymentOutcomeTracker;
+    DeploymentOutcomeTracker               deploymentOutcomeTracker;
     @Inject
     io.casehub.ops.app.k8s.K8sWatchManager watchManager;
 
-
-    /** Active loop index: clusterId -> Set of composite keys */
-    private final ConcurrentHashMap<String, Set<String>> activeLoops = new ConcurrentHashMap<>();
-
     @Transactional
     public ApplicationEntity createDraft(String name, String description,
-                                          String servicesJson, String tenancyId) {
+                                         String servicesJson, String tenancyId) {
         var app = new ApplicationEntity();
-        app.name = name;
-        app.description = description;
+        app.name         = name;
+        app.description  = description;
         app.servicesJson = servicesJson;
-        app.tenancyId = tenancyId;
-        app.status = ApplicationStatus.DRAFT;
+        app.tenancyId    = tenancyId;
+        app.status       = ApplicationStatus.DRAFT;
         app.persist();
         return app;
     }
@@ -103,18 +96,19 @@ public class ApplicationLifecycleService {
         for (ClusterReferenceEntity cluster : clusters) {
             String key = tenancyId + ":" + applicationId + ":" + cluster.id;
             deploymentOutcomeTracker.associateKey(deploymentRecord.id, cluster.id.toString(), key);
-        }}
+        }
+    }
 
     public void decommission(UUID applicationId, String tenancyId) {
         var app = ApplicationEntity.<ApplicationEntity>findById(applicationId);
-        if (app == null) throw new IllegalArgumentException("Application not found: " + applicationId);
+        if (app == null) {throw new IllegalArgumentException("Application not found: " + applicationId);}
 
-        List<ClusterReferenceEntity> clusters = clusterService.list(tenancyId);
-        Set<String> compositeKeys = new HashSet<>();
+        List<ClusterReferenceEntity> clusters      = clusterService.list(tenancyId);
+        Set<String>                  compositeKeys = new HashSet<>();
 
         for (ClusterReferenceEntity cluster : clusters) {
-            String key = tenancyId + ":" + applicationId + ":" + cluster.id;
-            var emptyGraph = graphFactory.of(List.of(), List.of());
+            String key        = tenancyId + ":" + applicationId + ":" + cluster.id;
+            var    emptyGraph = graphFactory.of(List.of(), List.of());
             reconciliationLoop.updateDesired(key, emptyGraph);
             compositeKeys.add(key);
         }
@@ -122,6 +116,53 @@ public class ApplicationLifecycleService {
         decommissionHandler.registerDecommission(app.id, compositeKeys);
         updateStatus(app, ApplicationStatus.DECOMMISSIONING);
     }
+
+    @Transactional
+    public Set<String> updateServiceReplicas(UUID applicationId, String serviceId,
+                                             int newReplicas, String tenancyId) {
+        var app = ApplicationEntity.<ApplicationEntity>findById(applicationId);
+        if (app == null) {throw new IllegalArgumentException("Application not found: " + applicationId);}
+        if (app.status != ApplicationStatus.RUNNING && app.status != ApplicationStatus.DEGRADED) {
+            throw new IllegalStateException("Cannot scale application in status " + app.status
+                                            + " — must be RUNNING or DEGRADED");
+        }
+
+        List<ServiceDefinition> services = parseServices(app.servicesJson);
+        boolean                 found    = false;
+        List<ServiceDefinition> updated  = new java.util.ArrayList<>();
+        for (ServiceDefinition sd : services) {
+            if (sd.serviceId().equals(serviceId)) {
+                found = true;
+                updated.add(new ServiceDefinition(sd.serviceId(), sd.name(), sd.image(), newReplicas,
+                                                  sd.ports(), sd.env(), sd.resources(), sd.dependsOn(), sd.healthCheck(), sd.targetClusters()));
+            } else {
+                updated.add(sd);
+            }
+        }
+        if (!found) {
+            throw new IllegalArgumentException("Service not found: " + serviceId);
+        }
+
+        try {
+            app.servicesJson = objectMapper.writeValueAsString(updated);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize updated services", e);
+        }
+
+        List<io.casehub.ops.app.entity.ClusterReferenceEntity> clusters        = clusterService.list(tenancyId);
+        Set<String>                                            affectedNodeIds = new java.util.HashSet<>();
+
+        for (var cluster : clusters) {
+            var graph = goalCompiler.compileForCluster(updated, cluster.id.toString(),
+                                                       cluster.namespace, graphFactory);
+            String key = tenancyId + ":" + applicationId + ":" + cluster.id;
+            reconciliationLoop.updateDesired(key, graph);
+            affectedNodeIds.add(cluster.id + ":" + serviceId + ":deployment");
+        }
+
+        return affectedNodeIds;
+    }
+
 
     public ApplicationStatus deriveStatus(ApplicationEntity app) {
         if (app.engineCaseId == null) {
@@ -134,7 +175,7 @@ public class ApplicationLifecycleService {
 
     public void trackLoopKey(String clusterId, String compositeKey) {
         activeLoops.computeIfAbsent(clusterId, k -> ConcurrentHashMap.newKeySet())
-                .add(compositeKey);
+                   .add(compositeKey);
     }
 
     public void removeLoopKey(String compositeKey) {
@@ -163,7 +204,8 @@ public class ApplicationLifecycleService {
                 }
             }
         }
-        return result;}
+        return result;
+    }
 
     // --- Internal methods ---
 
@@ -189,9 +231,9 @@ public class ApplicationLifecycleService {
     DeploymentRecordEntity recordDeployment(ApplicationEntity app, DeploymentTrigger trigger, DeploymentOutcome outcome) {
         var record = new DeploymentRecordEntity();
         record.applicationId = app.id;
-        record.topologyJson = app.servicesJson;
-        record.trigger = trigger;
-        record.outcome = outcome;
+        record.topologyJson  = app.servicesJson;
+        record.trigger       = trigger;
+        record.outcome       = outcome;
         record.persist();
         return record;
     }

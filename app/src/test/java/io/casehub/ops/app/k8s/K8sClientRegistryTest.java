@@ -5,10 +5,14 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class K8sClientRegistryTest {
 
@@ -16,7 +20,7 @@ class K8sClientRegistryTest {
 
     @AfterEach
     void cleanup() {
-        if (registry != null) registry.shutdown();
+        if (registry != null) {registry.shutdown();}
     }
 
     @Test
@@ -57,8 +61,11 @@ class K8sClientRegistryTest {
 
     @Test
     void registerWithNullCredentialRefSkipsResolution() {
-        AtomicBoolean called = new AtomicBoolean(false);
-        CredentialResolver resolver = ref -> { called.set(true); return Map.of(); };
+        AtomicBoolean      called   = new AtomicBoolean(false);
+        CredentialResolver resolver = ref -> {
+            called.set(true);
+            return Map.of();
+        };
         registry = new K8sClientRegistry(resolver);
 
         registry.register("c1", "https://localhost:6443", null, true);
@@ -69,8 +76,11 @@ class K8sClientRegistryTest {
 
     @Test
     void registerWithBlankCredentialRefSkipsResolution() {
-        AtomicBoolean called = new AtomicBoolean(false);
-        CredentialResolver resolver = ref -> { called.set(true); return Map.of(); };
+        AtomicBoolean      called   = new AtomicBoolean(false);
+        CredentialResolver resolver = ref -> {
+            called.set(true);
+            return Map.of();
+        };
         registry = new K8sClientRegistry(resolver);
 
         registry.register("c1", "https://localhost:6443", "  ", true);
@@ -131,5 +141,150 @@ class K8sClientRegistryTest {
         registry.register("c1", "https://localhost:6443", null, false);
 
         assertThat(registry.clientFor("c1").getConfiguration().isTrustCerts()).isFalse();
+    }
+
+    @Test
+    void registerParsesExpiresAt() {
+        Instant            expiry   = Instant.now().plus(Duration.ofHours(1));
+        CredentialResolver resolver = ref -> Map.of("bearer-token", "tok", "expires-at", expiry.toString());
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        assertThat(registry.clientFor("c1")).isNotNull();
+    }
+
+    @Test
+    void registerWithoutExpiresAtStoresNull() {
+        CredentialResolver resolver = ref -> Map.of("bearer-token", "tok");
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        assertThat(registry.clientFor("c1")).isNotNull();
+    }
+
+    @Test
+    void reRegisterUpdatesMetadataWithoutReplacingClient() {
+        CredentialResolver resolver = ref -> Map.of("bearer-token", "tok");
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds-v1", true);
+        KubernetesClient firstClient = registry.clientFor("c1");
+
+        registry.register("c1", "https://localhost:6443", "creds-v2", true);
+        KubernetesClient secondClient = registry.clientFor("c1");
+
+        assertThat(secondClient).isSameAs(firstClient);
+    }
+
+    @Test
+    void refreshReplacesClient() {
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            resolveCount.incrementAndGet();
+            return Map.of("bearer-token", "tok-" + resolveCount.get());
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        KubernetesClient before = registry.clientFor("c1");
+
+        registry.refreshClient("c1");
+        KubernetesClient after = registry.clientFor("c1");
+
+        assertThat(after).isNotSameAs(before);
+        assertThat(resolveCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void refreshPreservesRegistration() {
+        CredentialResolver resolver = ref -> Map.of("bearer-token", "tok");
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+
+        registry.refreshClient("c1");
+
+        assertThat(registry.clientFor("c1")).isNotNull();
+        assertThat(registry.clientFor("c1").getConfiguration().getOauthToken()).isEqualTo("tok");
+    }
+
+    @Test
+    void refreshUnknownClusterThrows() {
+        registry = new K8sClientRegistry(ref -> Map.of());
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> registry.refreshClient("unknown"))
+                .withMessageContaining("unknown");
+    }
+
+    @Test
+    void proactiveScanRefreshesApproachingExpiry() {
+        Instant       nearExpiry   = Instant.now().plus(Duration.ofMinutes(3));
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            resolveCount.incrementAndGet();
+            return Map.of("bearer-token", "tok", "expires-at", nearExpiry.toString());
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        int countAfterRegister = resolveCount.get();
+
+        registry.checkExpiring();
+
+        assertThat(resolveCount.get()).isGreaterThan(countAfterRegister);
+    }
+
+    @Test
+    void proactiveScanSkipsNullExpiry() {
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            resolveCount.incrementAndGet();
+            return Map.of("bearer-token", "tok");
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        int countAfterRegister = resolveCount.get();
+
+        registry.checkExpiring();
+
+        assertThat(resolveCount.get()).isEqualTo(countAfterRegister);
+    }
+
+    @Test
+    void proactiveScanSkipsDistantExpiry() {
+        Instant       farExpiry    = Instant.now().plus(Duration.ofHours(2));
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            resolveCount.incrementAndGet();
+            return Map.of("bearer-token", "tok", "expires-at", farExpiry.toString());
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        int countAfterRegister = resolveCount.get();
+
+        registry.checkExpiring();
+
+        assertThat(resolveCount.get()).isEqualTo(countAfterRegister);
+    }
+
+    @Test
+    void refreshCoalescesConcurrentCalls() throws Exception {
+        java.util.concurrent.CountDownLatch refreshStarted = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch proceed = new java.util.concurrent.CountDownLatch(1);
+        AtomicInteger resolveCount = new AtomicInteger();
+        CredentialResolver resolver = ref -> {
+            int count = resolveCount.incrementAndGet();
+            if (count > 1) {
+                refreshStarted.countDown();
+                try { proceed.await(5, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+            return Map.of("bearer-token", "tok-" + count);
+        };
+        registry = new K8sClientRegistry(resolver);
+        registry.register("c1", "https://localhost:6443", "creds", true);
+        int countAfterRegister = resolveCount.get();
+
+        java.util.concurrent.CompletableFuture<Void> first = java.util.concurrent.CompletableFuture.runAsync(() -> registry.refreshClient("c1"));
+        refreshStarted.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        java.util.concurrent.CompletableFuture<Void> second = java.util.concurrent.CompletableFuture.runAsync(() -> registry.refreshClient("c1"));
+
+        proceed.countDown();
+        java.util.concurrent.CompletableFuture.allOf(first, second).join();
+
+        assertThat(resolveCount.get()).isEqualTo(countAfterRegister + 1);
     }
 }
