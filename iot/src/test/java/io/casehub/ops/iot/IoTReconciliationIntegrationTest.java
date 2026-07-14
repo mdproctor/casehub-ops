@@ -59,6 +59,7 @@ class IoTReconciliationIntegrationTest {
             public List<DeviceEntity> findByTenancyId(String t) { return List.of(); }
             public List<DeviceEntity> findAll() { return List.copyOf(devices.values()); }
             public Uni<Void> refresh() { return Uni.createFrom().voidItem(); }
+            public Uni<Void> refresh(String providerId) { return Uni.createFrom().voidItem(); }
         };
 
         DeviceProvider provider = new DeviceProvider() {

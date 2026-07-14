@@ -1,15 +1,14 @@
 package io.casehub.ops.infra;
 
-import java.util.List;
-
-import jakarta.enterprise.context.ApplicationScoped;
-
 import io.casehub.desiredstate.api.ActualState;
 import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.FaultEvent;
 import io.casehub.desiredstate.api.FaultPolicy;
 import io.casehub.desiredstate.api.FaultType;
 import io.casehub.desiredstate.api.GraphMutation;
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.List;
 
 /**
  * Default fault rules for the infrastructure domain.
@@ -28,7 +27,7 @@ import io.casehub.desiredstate.api.GraphMutation;
 public class InfraFaultPolicy implements FaultPolicy {
 
     @Override
-    public List<GraphMutation> onFault(FaultEvent event, DesiredStateGraph current, ActualState actualState) {
+    public List<GraphMutation> onFault(String tenancyId, FaultEvent event, DesiredStateGraph current, ActualState actualState) {
         return List.of();
     }
 }

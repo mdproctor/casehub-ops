@@ -124,6 +124,7 @@ class IoTActualStateAdapterTest {
             public List<DeviceEntity> findByTenancyId(String t) { return List.of(); }
             public List<DeviceEntity> findAll() { return List.of(devices); }
             public io.smallrye.mutiny.Uni<Void> refresh() { return io.smallrye.mutiny.Uni.createFrom().voidItem(); }
+            public io.smallrye.mutiny.Uni<Void> refresh(String providerId) { return io.smallrye.mutiny.Uni.createFrom().voidItem(); }
         };
     }
 }

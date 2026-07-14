@@ -13,7 +13,7 @@ import java.util.List;
 public class IoTFaultPolicy implements FaultPolicy {
 
     @Override
-    public List<GraphMutation> onFault(FaultEvent event, DesiredStateGraph current, ActualState actualState) {
+    public List<GraphMutation> onFault(String tenancyId, FaultEvent event, DesiredStateGraph current, ActualState actualState) {
         return List.of();
     }
 }

@@ -189,6 +189,7 @@ class IoTNodeProvisionerTest {
             public List<DeviceEntity> findByTenancyId(String t) { return List.of(); }
             public List<DeviceEntity> findAll() { return List.of(device); }
             public Uni<Void> refresh() { return Uni.createFrom().voidItem(); }
+            public Uni<Void> refresh(String providerId) { return Uni.createFrom().voidItem(); }
         };
     }
 
@@ -199,6 +200,7 @@ class IoTNodeProvisionerTest {
             public List<DeviceEntity> findByTenancyId(String t) { return List.of(); }
             public List<DeviceEntity> findAll() { return List.of(); }
             public Uni<Void> refresh() { return Uni.createFrom().voidItem(); }
+            public Uni<Void> refresh(String providerId) { return Uni.createFrom().voidItem(); }
         };
     }
 }

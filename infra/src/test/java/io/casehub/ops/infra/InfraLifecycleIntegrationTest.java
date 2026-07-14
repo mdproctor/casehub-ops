@@ -190,7 +190,7 @@ class InfraLifecycleIntegrationTest {
                 FaultType.PROVISION_FAILED,
                 "unsupported resource type");
 
-        var mutations = faultPolicy.onFault(faultEvent, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
+        var mutations = faultPolicy.onFault("tenant-1", faultEvent, GRAPH_FACTORY.empty(), new ActualState(java.util.Map.of()));
 
         assertThat(mutations).isEmpty();
     }

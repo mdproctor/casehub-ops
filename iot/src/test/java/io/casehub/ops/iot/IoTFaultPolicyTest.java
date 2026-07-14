@@ -15,7 +15,7 @@ class IoTFaultPolicyTest {
     void onFault_returnsEmptyList() {
         var policy = new IoTFaultPolicy();
         var event = new FaultEvent(NodeId.of("dev-1"), FaultType.PROVISION_FAILED, "test");
-        var mutations = policy.onFault(event, new DefaultDesiredStateGraphFactory().empty(), new ActualState(java.util.Map.of()));
+        var mutations = policy.onFault("tenant-1", event, new DefaultDesiredStateGraphFactory().empty(), new ActualState(java.util.Map.of()));
         assertThat(mutations).isEmpty();
     }
 }

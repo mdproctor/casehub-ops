@@ -10,6 +10,8 @@ import io.casehub.ops.deployment.DeploymentTrustRoutingPolicyProvider;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.Set;
+
 /**
  * Provisions trust policy nodes by storing their routing policies in the DeploymentTrustRoutingPolicyProvider.
  * Deprovision removes the policy, reverting the capability to TrustRoutingPolicy.DEFAULT.
@@ -36,7 +38,8 @@ public class TrustPolicyProvisionHandler {
                 spec.qualityFloors(),
                 spec.bootstrapEscalationRequired(),
                 null,
-                Set.of()
+                Set.of(),
+                0.0
         );
         policyProvider.store(spec.capability(), policy);
         return new ProvisionResult.Success();

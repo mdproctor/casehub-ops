@@ -268,7 +268,7 @@ class DeploymentLifecycleIntegrationTest {
         var graph = graphFactory.empty();
         var event = new FaultEvent(NodeId.of("node-1"), FaultType.PROVISION_FAILED, "test error");
 
-        var mutations = faultPolicy.onFault(event, graph, new ActualState(Map.of()));
+        var mutations = faultPolicy.onFault("tenant-1", event, graph, new ActualState(Map.of()));
 
         assertThat(mutations).isEmpty();
     }
