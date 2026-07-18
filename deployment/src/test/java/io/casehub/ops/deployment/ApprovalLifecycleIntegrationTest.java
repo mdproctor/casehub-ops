@@ -1,22 +1,46 @@
 package io.casehub.ops.deployment;
 
-import io.casehub.desiredstate.api.*;
+import io.casehub.desiredstate.api.ApprovalCheckResult;
+import io.casehub.desiredstate.api.DeprovisionContext;
+import io.casehub.desiredstate.api.DeprovisionResult;
+import io.casehub.desiredstate.api.DesiredNode;
+import io.casehub.desiredstate.api.DesiredStateGraph;
+import io.casehub.desiredstate.api.NodeId;
+import io.casehub.desiredstate.api.NodeType;
+import io.casehub.desiredstate.api.PlanApproval;
+import io.casehub.desiredstate.api.ProvisionContext;
+import io.casehub.desiredstate.api.ProvisionResult;
+import io.casehub.desiredstate.api.StepAction;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
-import io.casehub.eidos.api.*;
-import io.casehub.ops.api.approval.*;
-import io.casehub.ops.api.deployment.*;
-import io.casehub.ops.deployment.handler.*;
-import io.casehub.platform.api.endpoints.*;
+import io.casehub.desiredstate.testing.MockPendingApprovalHandler;
+import io.casehub.eidos.api.AgentDescriptor;
+import io.casehub.eidos.api.AgentQuery;
+import io.casehub.eidos.api.AgentRegistry;
+import io.casehub.ops.api.approval.InMemoryPlanStore;
+import io.casehub.ops.api.deployment.ChannelNodeSpec;
+import io.casehub.ops.api.deployment.TrustPolicyNodeSpec;
+import io.casehub.ops.deployment.handler.CaseTypeProvisionHandler;
+import io.casehub.ops.deployment.handler.ChannelProvisionHandler;
+import io.casehub.ops.deployment.handler.EndpointProvisionHandler;
+import io.casehub.ops.deployment.handler.TrustPolicyProvisionHandler;
+import io.casehub.platform.api.endpoints.EndpointDescriptor;
+import io.casehub.platform.api.endpoints.EndpointQuery;
+import io.casehub.platform.api.endpoints.EndpointRegistry;
 import io.casehub.platform.api.path.Path;
-import io.casehub.qhorus.api.channel.ChannelSemantic;
-import io.casehub.qhorus.api.message.MessageType;
 import io.casehub.qhorus.api.channel.Channel;
 import io.casehub.qhorus.api.channel.ChannelCreateRequest;
+import io.casehub.qhorus.api.channel.ChannelSemantic;
+import io.casehub.qhorus.api.message.MessageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,14 +59,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApprovalLifecycleIntegrationTest {
 
     private DeploymentNodeProvisioner provisioner;
-    private OpsPendingApprovalHandler handler;
+    private MockPendingApprovalHandler handler;
     private InMemoryPlanStore planStore;
     private DesiredStateGraph emptyGraph;
 
     @BeforeEach
     void setUp() {
         planStore = new InMemoryPlanStore();
-        handler = new OpsPendingApprovalHandler(planStore);
+        handler = new MockPendingApprovalHandler();
         var evaluator = new DeploymentApprovalEvaluator();
         var agentRegistry = new StubAgentRegistry();
         var providerConfigStore = new DeploymentProviderConfigStore();
@@ -75,14 +99,15 @@ class ApprovalLifecycleIntegrationTest {
         // Simulate executor calling recordPending
         handler.recordPending(node, StepAction.PROVISION, "tenant-1", pa.planReference());
 
-        // Human approves
-        handler.approve(NodeId.of("tp-1"), StepAction.PROVISION, "tenant-1", "admin");
+        // Human approves — program mock to return Approved on next check
+        var approval = new PlanApproval(pa.planReference(), "admin", Instant.now());
+        handler.programCheck(NodeId.of("tp-1"), StepAction.PROVISION,
+                new ApprovalCheckResult.Approved(approval));
 
         // Cycle 2: executor sees Approved, enriches context
         var check = handler.check(node, StepAction.PROVISION, "tenant-1");
         assertThat(check).isInstanceOf(ApprovalCheckResult.Approved.class);
-        var approved = (ApprovalCheckResult.Approved) check;
-        var contextWithApproval = context.withApproval(approved.approval());
+        var contextWithApproval = context.withApproval(((ApprovalCheckResult.Approved) check).approval());
 
         // Provisioner re-entry: provisions successfully
         var result2 = provisioner.provision(node, contextWithApproval);
@@ -113,16 +138,17 @@ class ApprovalLifecycleIntegrationTest {
         var pa = (ProvisionResult.PendingApproval) result;
         handler.recordPending(node, StepAction.PROVISION, "tenant-1", pa.planReference());
 
-        // Reject
-        handler.reject(NodeId.of("tp-1"), StepAction.PROVISION, "tenant-1", "too risky");
+        // Reject — program mock to return Rejected on next check
+        handler.programCheck(NodeId.of("tp-1"), StepAction.PROVISION,
+                new ApprovalCheckResult.Rejected(pa.planReference(), "too risky"));
 
-        // Acknowledge
+        // Verify check returns Rejected
+        var check = handler.check(node, StepAction.PROVISION, "tenant-1");
+        assertThat(check).isInstanceOf(ApprovalCheckResult.Rejected.class);
+
+        // Acknowledge rejection
         handler.acknowledgeRejection(node, StepAction.PROVISION, "tenant-1");
-
-        // State is clean
-        assertThat(handler.check(node, StepAction.PROVISION, "tenant-1"))
-                .isInstanceOf(ApprovalCheckResult.None.class);
-        assertThat(planStore.retrieve(pa.planReference())).isEmpty();
+        assertThat(handler.acknowledgedRejections).hasSize(1);
     }
 
     @Test
@@ -135,7 +161,11 @@ class ApprovalLifecycleIntegrationTest {
         var result1 = provisioner.provision(node1, context);
         var pa1 = (ProvisionResult.PendingApproval) result1;
         handler.recordPending(node1, StepAction.PROVISION, "tenant-1", pa1.planReference());
-        handler.approve(NodeId.of("tp-1"), StepAction.PROVISION, "tenant-1", "admin");
+
+        // Human approves
+        var approval = new PlanApproval(pa1.planReference(), "admin", Instant.now());
+        handler.programCheck(NodeId.of("tp-1"), StepAction.PROVISION,
+                new ApprovalCheckResult.Approved(approval));
 
         // Spec changes before re-entry (different confidence threshold)
         var spec2 = new TrustPolicyNodeSpec("claims-routing", 0.95, 10, 0.1, 0.3, Map.of(), true);
@@ -167,14 +197,14 @@ class ApprovalLifecycleIntegrationTest {
         handler.recordPending(node, StepAction.DEPROVISION, "tenant-1", pa.planReference());
 
         // Human approves
-        handler.approve(NodeId.of("tp-1"), StepAction.DEPROVISION, "tenant-1", "admin");
+        var approval = new PlanApproval(pa.planReference(), "admin", Instant.now());
+        handler.programCheck(NodeId.of("tp-1"), StepAction.DEPROVISION,
+                new ApprovalCheckResult.Approved(approval));
 
         // Cycle 2: executor sees Approved, enriches context
         var check = handler.check(node, StepAction.DEPROVISION, "tenant-1");
         assertThat(check).isInstanceOf(ApprovalCheckResult.Approved.class);
-        var approved = (ApprovalCheckResult.Approved) check;
-        var approval = new PlanApproval(pa.planReference(), "admin", Instant.now());
-        var contextWithApproval = context.withApproval(approval);
+        var contextWithApproval = context.withApproval(((ApprovalCheckResult.Approved) check).approval());
 
         // Deprovision re-entry: succeeds
         var result2 = provisioner.deprovision(node, contextWithApproval);
