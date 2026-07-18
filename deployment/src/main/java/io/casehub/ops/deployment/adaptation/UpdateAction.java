@@ -43,7 +43,8 @@ final class UpdateAction {
             base.setAll(overrides);
             NodeSpec merged = mapper.treeToValue(base, node.spec().getClass());
 
-            return graph.withMutation(new GraphMutation.UpdateNode(targetId, merged));
+            DesiredNode adaptedNode = new DesiredNode(targetId, node.type(), merged, node.humanGating());
+            return graph.withMutation(new GraphMutation.UpdateNode(targetId, adaptedNode));
         } catch (Exception e) {
             throw new IllegalStateException(
                 "Failed to merge fields for node " + targetId + ": " + e.getMessage(), e);

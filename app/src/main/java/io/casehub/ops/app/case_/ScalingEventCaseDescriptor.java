@@ -84,7 +84,7 @@ public final class ScalingEventCaseDescriptor {
 
     static WorkerResult evaluateScaling(Map<String, Object> input) {
         if (input == null) {
-            return WorkerResult.failed("Scaling spec is null — .scalingSpec missing from parent blackboard");
+            return WorkerResult.failed("Scaling spec is null — .scalingRequired missing from parent blackboard");
         }
 
         String serviceId = (String) input.get("serviceId");
@@ -105,12 +105,6 @@ public final class ScalingEventCaseDescriptor {
         }
 
         ScalingPolicy policy = buildPolicy(input);
-
-        String            lastScalingTs    = (String) input.get("lastScalingTimestamp");
-        java.time.Instant lastScalingEvent = lastScalingTs != null ? java.time.Instant.parse(lastScalingTs) : null;
-        if (policy.isCoolingDown(lastScalingEvent, java.time.Instant.now())) {
-            return WorkerResult.of(Map.of("scalingStatus", "cooling-down"));
-        }
 
         targetReplicas = policy.clamp(targetReplicas);
 

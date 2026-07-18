@@ -63,8 +63,8 @@ class ApprovalLifecycleIntegrationTest {
 
     @Test
     void happyPath_highRiskNodeRequiresApproval_thenProvisions() {
-        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
-        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), true);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var context = new ProvisionContext("tenant-1", emptyGraph);
 
         // Cycle 1: provisioner returns PendingApproval
@@ -96,7 +96,7 @@ class ApprovalLifecycleIntegrationTest {
     void autoApprove_lowRiskNodeProvisionsDirect() {
         var spec = new ChannelNodeSpec("dev/work", "desc", ChannelSemantic.APPEND,
                 Set.of(MessageType.COMMAND), Set.of(), null, null, null, null, null, null, null, null, null);
-        var node = new DesiredNode(NodeId.of("ch-1"), NodeType.of("channel"), spec, false);
+        var node = new DesiredNode(NodeId.of("ch-1"), NodeType.of("channel"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var context = new ProvisionContext("tenant-1", emptyGraph);
 
         var result = provisioner.provision(node, context);
@@ -105,8 +105,8 @@ class ApprovalLifecycleIntegrationTest {
 
     @Test
     void rejection_cleansUpPlanOnAcknowledge() {
-        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
-        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), true);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var context = new ProvisionContext("tenant-1", emptyGraph);
 
         var result = provisioner.provision(node, context);
@@ -127,8 +127,8 @@ class ApprovalLifecycleIntegrationTest {
 
     @Test
     void staleApproval_specChangedSinceApproval_reEvaluates() {
-        var spec1 = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
-        var node1 = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec1, false);
+        var spec1 = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), true);
+        var node1 = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec1, io.casehub.desiredstate.api.HumanGating.NONE);
         var context = new ProvisionContext("tenant-1", emptyGraph);
 
         // Cycle 1: PendingApproval for spec1
@@ -138,8 +138,8 @@ class ApprovalLifecycleIntegrationTest {
         handler.approve(NodeId.of("tp-1"), StepAction.PROVISION, "tenant-1", "admin");
 
         // Spec changes before re-entry (different confidence threshold)
-        var spec2 = new TrustPolicyNodeSpec("claims-routing", 0.95, 10, 0.1, 0.3, Map.of(), false);
-        var node2 = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec2, false);
+        var spec2 = new TrustPolicyNodeSpec("claims-routing", 0.95, 10, 0.1, 0.3, Map.of(), true);
+        var node2 = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec2, io.casehub.desiredstate.api.HumanGating.NONE);
 
         var check = handler.check(node2, StepAction.PROVISION, "tenant-1");
         var contextWithApproval = context.withApproval(((ApprovalCheckResult.Approved) check).approval());
@@ -154,8 +154,8 @@ class ApprovalLifecycleIntegrationTest {
 
     @Test
     void deprovisionApprovalFlow() {
-        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), false);
-        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, false);
+        var spec = new TrustPolicyNodeSpec("claims-routing", 0.85, 10, 0.1, 0.3, Map.of(), true);
+        var node = new DesiredNode(NodeId.of("tp-1"), NodeType.of("trust"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var context = new DeprovisionContext("tenant-1", emptyGraph);
 
         // Cycle 1: deprovision returns PendingApproval

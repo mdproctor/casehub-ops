@@ -37,7 +37,7 @@ class UpdateActionTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
 
@@ -74,7 +74,7 @@ class UpdateActionTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
 
@@ -102,7 +102,7 @@ class UpdateActionTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
 
@@ -130,7 +130,7 @@ class UpdateActionTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
 
@@ -155,7 +155,7 @@ class UpdateActionTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
 

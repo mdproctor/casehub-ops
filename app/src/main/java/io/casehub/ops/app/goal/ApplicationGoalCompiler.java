@@ -35,7 +35,7 @@ public class ApplicationGoalCompiler {
         NodeId nsNodeId = NodeId.of(clusterId + ":namespace");
         nodes.add(new DesiredNode(nsNodeId, ApplicationNodeTypes.K8S_NAMESPACE,
                                   new InfraDesiredNodeSpec(new K8sNamespaceSpec(namespace, appLabels), backendId),
-                                  false));
+                                  io.casehub.desiredstate.api.HumanGating.NONE));
 
         List<ServiceDefinition> clusterServices = services.stream()
                                                           .filter(sd -> sd.targetClusters().isEmpty() || sd.targetClusters().contains(clusterId))
@@ -55,7 +55,7 @@ public class ApplicationGoalCompiler {
                     namespace, sd.serviceId(), sd.image(), sd.replicas(),
                     sd.resources(), svcLabels, sd.ports(), sd.env(), sd.healthCheck());
             nodes.add(new DesiredNode(deployId, ApplicationNodeTypes.K8S_DEPLOYMENT,
-                                      new InfraDesiredNodeSpec(deploySpec, backendId), false));
+                                      new InfraDesiredNodeSpec(deploySpec, backendId), io.casehub.desiredstate.api.HumanGating.NONE));
             dependencies.add(new Dependency(deployId, nsNodeId));
 
             if (!sd.ports().isEmpty()) {
@@ -66,7 +66,7 @@ public class ApplicationGoalCompiler {
                         firstPort.servicePort(), firstPort.containerPort(),
                         ServiceType.CLUSTER_IP, svcLabels, selectorLabels);
                 nodes.add(new DesiredNode(svcId, ApplicationNodeTypes.K8S_SERVICE,
-                                          new InfraDesiredNodeSpec(svcSpec, backendId), false));
+                                          new InfraDesiredNodeSpec(svcSpec, backendId), io.casehub.desiredstate.api.HumanGating.NONE));
                 dependencies.add(new Dependency(svcId, deployId));
             }
 

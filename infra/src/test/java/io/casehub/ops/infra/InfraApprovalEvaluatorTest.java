@@ -156,7 +156,7 @@ class InfraApprovalEvaluatorTest {
                 List.of(backend), new ApprovalThresholds(RiskClassification.HIGH));
 
         NodeSpec rawSpec = new NodeSpec() {};
-        var node = new DesiredNode(NodeId.of("x-1"), NodeType.of("unknown"), rawSpec, false);
+        var node = new DesiredNode(NodeId.of("x-1"), NodeType.of("unknown"), rawSpec, io.casehub.desiredstate.api.HumanGating.NONE);
 
         var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
 
@@ -221,6 +221,6 @@ class InfraApprovalEvaluatorTest {
 
     private static DesiredNode infraNode(NodeId nodeId, InfraNodeSpec resourceSpec, String backendId) {
         return new DesiredNode(nodeId, NodeType.of(resourceSpec.resourceType()),
-                new InfraDesiredNodeSpec(resourceSpec, backendId), false);
+                new InfraDesiredNodeSpec(resourceSpec, backendId), io.casehub.desiredstate.api.HumanGating.NONE);
     }
 }

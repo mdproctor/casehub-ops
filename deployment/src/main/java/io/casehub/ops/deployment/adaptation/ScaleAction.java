@@ -52,7 +52,7 @@ final class ScaleAction {
                     nid,
                     baseNode.type(),
                     agentSpec.withAgentId(derivedId),
-                    baseNode.requiresHuman()
+                    baseNode.humanGating()
                 );
                 result = result.withNode(derived);
             }

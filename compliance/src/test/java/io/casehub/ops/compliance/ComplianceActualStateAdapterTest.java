@@ -30,7 +30,7 @@ class ComplianceActualStateAdapterTest {
     void absentWhenNoEvidence() {
         evidenceService.nextStatus = ControlEvidenceStatus.absent("enc", "ENCRYPTION_AT_REST", 30);
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.ABSENT);
@@ -43,7 +43,7 @@ class ComplianceActualStateAdapterTest {
                 Instant.now(), 30, false, NodeStatus.PRESENT);
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
         specHashStore.record(NodeId.of("enc"), spec);
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.PRESENT);
@@ -58,7 +58,7 @@ class ComplianceActualStateAdapterTest {
         specHashStore.record(NodeId.of("enc"), specOld);
         var specNew = new ComplianceControlSpec(
                 "enc", "ENCRYPTION_AT_REST", "FILE_EXISTENCE", "Changed", "D", List.of(), 30, false, Map.of());
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), specNew, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), specNew, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
@@ -70,7 +70,7 @@ class ComplianceActualStateAdapterTest {
                 "enc", "ENCRYPTION_AT_REST", EvidenceOutcome.FAIL,
                 Instant.now(), 30, false, NodeStatus.DRIFTED);
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
@@ -82,7 +82,7 @@ class ComplianceActualStateAdapterTest {
                 "enc", "ENCRYPTION_AT_REST", EvidenceOutcome.UNAVAILABLE,
                 Instant.now(), 30, false, NodeStatus.DRIFTED);
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);
@@ -94,7 +94,7 @@ class ComplianceActualStateAdapterTest {
                 "enc", "ENCRYPTION_AT_REST", EvidenceOutcome.PASS,
                 Instant.now().minus(60, ChronoUnit.DAYS), 30, true, NodeStatus.DRIFTED);
         var spec = minimalSpec("enc", "ENCRYPTION_AT_REST");
-        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, false);
+        var node = new DesiredNode(NodeId.of("enc"), NodeType.of("ENCRYPTION_AT_REST"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
         ActualState actual = adapter.readActual(graph, "default");
         assertThat(actual.statuses().get(NodeId.of("enc"))).isEqualTo(NodeStatus.DRIFTED);

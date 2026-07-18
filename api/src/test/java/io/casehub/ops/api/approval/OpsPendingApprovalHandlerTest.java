@@ -21,7 +21,7 @@ class OpsPendingApprovalHandlerTest {
     }
 
     private DesiredNode testNode() {
-        return new DesiredNode(NODE_1, NodeType.of("agent"), new StubSpec(), false);
+        return new DesiredNode(NODE_1, NodeType.of("agent"), new StubSpec(), io.casehub.desiredstate.api.HumanGating.NONE);
     }
 
     // --- check() returns None when nothing recorded ---

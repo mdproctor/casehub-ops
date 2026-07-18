@@ -39,19 +39,16 @@ public class IoTGoalCompiler implements GoalCompiler<IoTGoals> {
             if (goal.physical()) {
                 nodes.add(new DesiredNode(
                     NodeId.of(goal.deviceId()), PHYSICAL_DEVICE,
-                    new PhysicalDeviceSpec(goal.deviceId(), goal.deviceClass(), goal.label()),
-                    false));
+                    new PhysicalDeviceSpec(goal.deviceId(), goal.deviceClass(), goal.label()), io.casehub.desiredstate.api.HumanGating.ALL));
                 nodes.add(new DesiredNode(
                     NodeId.of(goal.deviceId() + "-config"), DEVICE_CONFIG,
-                    new DeviceConfigSpec(goal.deviceId(), goal.deviceClass(), goal.config()),
-                    false));
+                    new DeviceConfigSpec(goal.deviceId(), goal.deviceClass(), goal.config()), io.casehub.desiredstate.api.HumanGating.NONE));
                 deps.add(new Dependency(
                     NodeId.of(goal.deviceId() + "-config"), NodeId.of(goal.deviceId())));
             } else {
                 nodes.add(new DesiredNode(
                     NodeId.of(goal.deviceId()), DEVICE_CONFIG,
-                    new DeviceConfigSpec(goal.deviceId(), goal.deviceClass(), goal.config()),
-                    false));
+                    new DeviceConfigSpec(goal.deviceId(), goal.deviceClass(), goal.config()), io.casehub.desiredstate.api.HumanGating.NONE));
             }
 
             for (String depId : goal.dependsOn()) {

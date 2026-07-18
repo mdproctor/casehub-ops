@@ -72,7 +72,7 @@ public class InfraGoalCompiler implements GoalCompiler<InfraGoals> {
             validateBackendCompatibility(decl.type(), backendId);
 
             var wrapper = new InfraDesiredNodeSpec(resourceSpec, backendId);
-            nodes.add(new DesiredNode(NodeId.of(decl.id()), NodeType.of(decl.type()), wrapper, false));
+            nodes.add(new DesiredNode(NodeId.of(decl.id()), NodeType.of(decl.type()), wrapper, io.casehub.desiredstate.api.HumanGating.NONE));
 
             for (String dep : decl.dependsOn()) {
                 // decl.id() depends on dep: Dependency(from=dependent, to=dependency)
@@ -85,7 +85,7 @@ public class InfraGoalCompiler implements GoalCompiler<InfraGoals> {
             InfraNodeSpec resourceSpec = parseSpec(decl.type(), decl.config());
 
             var wrapper = new InfraDesiredNodeSpec(resourceSpec, backendId);
-            nodes.add(new DesiredNode(NodeId.of(decl.id()), NodeType.of(decl.type()), wrapper, false));
+            nodes.add(new DesiredNode(NodeId.of(decl.id()), NodeType.of(decl.type()), wrapper, io.casehub.desiredstate.api.HumanGating.NONE));
 
             for (String dep : decl.dependsOn()) {
                 dependencies.add(new Dependency(NodeId.of(decl.id()), NodeId.of(dep)));

@@ -47,6 +47,11 @@ public class ApplicationLifecycleService {
     DeploymentOutcomeTracker               deploymentOutcomeTracker;
     @Inject
     io.casehub.ops.app.k8s.K8sWatchManager watchManager;
+    @Inject
+    SituationScalingEvaluator              scalingEvaluator;
+    @Inject
+    DriftSignalBridge                      driftSignalBridge;
+
 
     @Transactional
     public ApplicationEntity createDraft(String name, String description,
@@ -97,6 +102,17 @@ public class ApplicationLifecycleService {
             String key = tenancyId + ":" + applicationId + ":" + cluster.id;
             deploymentOutcomeTracker.associateKey(deploymentRecord.id, cluster.id.toString(), key);
         }
+
+        java.util.Map<String, Integer> baseReplicas = new java.util.HashMap<>();
+        for (ServiceDefinition sd : services) {
+            baseReplicas.put(sd.serviceId(), sd.replicas());
+        }
+        scalingEvaluator.register(tenancyId, app.engineCaseId, applicationId.toString(), baseReplicas);
+
+        for (ClusterReferenceEntity cluster : clusters) {
+            String key = tenancyId + ":" + applicationId + ":" + cluster.id;
+            driftSignalBridge.registerApplication(key, app.engineCaseId, applicationId.toString(), cluster.id.toString());
+        }
     }
 
     public void decommission(UUID applicationId, String tenancyId) {
@@ -115,6 +131,11 @@ public class ApplicationLifecycleService {
 
         decommissionHandler.registerDecommission(app.id, compositeKeys);
         updateStatus(app, ApplicationStatus.DECOMMISSIONING);
+
+        scalingEvaluator.deregister(tenancyId, applicationId.toString());
+        for (String key : compositeKeys) {
+            driftSignalBridge.deregisterApplication(key);
+        }
     }
 
     @Transactional
@@ -134,7 +155,7 @@ public class ApplicationLifecycleService {
             if (sd.serviceId().equals(serviceId)) {
                 found = true;
                 updated.add(new ServiceDefinition(sd.serviceId(), sd.name(), sd.image(), newReplicas,
-                                                  sd.ports(), sd.env(), sd.resources(), sd.dependsOn(), sd.healthCheck(), sd.targetClusters()));
+                                                  sd.ports(), sd.env(), sd.resources(), sd.dependsOn(), sd.healthCheck(), sd.targetClusters(), sd.scalingRules()));
             } else {
                 updated.add(sd);
             }

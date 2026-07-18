@@ -167,8 +167,8 @@ class ScaleActionTest {
         var trustNode = new DesiredNode(
             NodeId.of("trust-policy"),
             NodeType.of("trust_policy"),
-            new TrustPolicyNodeSpec("risk-assessment", 0.8, 10, 0.05, 0.7, Map.of(), false),
-            false
+            new TrustPolicyNodeSpec("risk-assessment", 0.8, 10, 0.05, 0.7, Map.of(), true),
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(trustNode), List.of());
         var situation = new ActiveSituation("high-load", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
@@ -201,6 +201,6 @@ class ScaleActionTest {
             null, null, null, null,
             List.of(), null, null, null, null, List.of()
         );
-        return new DesiredNode(NodeId.of(agentId), NodeType.of("agent"), spec, false);
+        return new DesiredNode(NodeId.of(agentId), NodeType.of("agent"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
     }
 }

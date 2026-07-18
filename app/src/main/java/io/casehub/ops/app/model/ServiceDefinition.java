@@ -1,13 +1,13 @@
 package io.casehub.ops.app.model;
 
+import io.casehub.ops.api.infra.types.HealthCheckSpec;
+import io.casehub.ops.api.infra.types.PortMapping;
+import io.casehub.ops.api.infra.types.ResourceRequirements;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-
-import io.casehub.ops.api.infra.types.HealthCheckSpec;
-import io.casehub.ops.api.infra.types.PortMapping;
-import io.casehub.ops.api.infra.types.ResourceRequirements;
 
 public record ServiceDefinition(
         String serviceId,
@@ -19,7 +19,8 @@ public record ServiceDefinition(
         ResourceRequirements resources,
         List<String> dependsOn,
         Optional<HealthCheckSpec> healthCheck,
-        List<String> targetClusters) {
+        List<String> targetClusters,
+        List<ScalingRule> scalingRules) {
 
     public ServiceDefinition {
         Objects.requireNonNull(serviceId, "serviceId");
@@ -35,5 +36,7 @@ public record ServiceDefinition(
         Objects.requireNonNull(healthCheck, "healthCheck");
         Objects.requireNonNull(targetClusters, "targetClusters");
         targetClusters = List.copyOf(targetClusters);
+        if (scalingRules == null) scalingRules = List.of();
+        scalingRules = List.copyOf(scalingRules);
     }
 }

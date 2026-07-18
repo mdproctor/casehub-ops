@@ -115,7 +115,7 @@ class ApplicationGoalCompilerTest {
                                        List<String> targetClusters) {
         return new ServiceDefinition(id, id, image, replicas, ports, Map.of(),
                 new ResourceRequirements("500m", "1Gi", "250m", "512Mi"),
-                dependsOn, Optional.empty(), targetClusters);
+                dependsOn, Optional.empty(), targetClusters, List.of());
     }
 
     private io.casehub.ops.api.infra.InfraNodeSpec unwrap(io.casehub.desiredstate.api.NodeSpec spec) {

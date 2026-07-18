@@ -240,19 +240,14 @@ class ScalingEventCaseDescriptorTest {
     }
 
     @Test
-    void evaluateCoolingDownRejectsScaling() {
-        var input = new java.util.HashMap<String, Object>();
-        input.put("applicationId", UUID.randomUUID().toString());
-        input.put("tenancyId", "tenant-1");
-        input.put("serviceId", "order-processor");
-        input.put("currentReplicas", 3);
-        input.put("targetReplicas", 6);
-        input.put("cooldownSeconds", 300);
-        input.put("lastScalingTimestamp", java.time.Instant.now().minus(java.time.Duration.ofSeconds(60)).toString());
-
-        WorkerResult result = ScalingEventCaseDescriptor.evaluateScaling(input);
-
-        assertThat(result.output()).containsEntry("scalingStatus", "cooling-down");
+    void scalingRequiredBindingUsesUnifiedPath() {
+        var def = ApplicationCaseDescriptor.build();
+        var binding = def.getBindings().stream()
+                .filter(b -> b.getName().equals("on-scaling-required"))
+                .findFirst().orElseThrow();
+        var subCaseTarget = (io.casehub.api.model.SubCaseTarget) binding.target();
+        var inputMapping = (io.casehub.api.model.SubCaseMapping.Expression) subCaseTarget.subCase().inputMapping();
+        assertThat(inputMapping.expression()).isEqualTo(".scalingRequired");
     }
 
     @Test

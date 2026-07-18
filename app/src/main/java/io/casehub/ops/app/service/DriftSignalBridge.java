@@ -22,11 +22,6 @@ public class DriftSignalBridge {
 
     private static final Logger LOG = Logger.getLogger(DriftSignalBridge.class.getName());
 
-    @FunctionalInterface
-    public interface CaseSignaler {
-        void signal(UUID caseId, String path, Object value);
-    }
-
     private record AppRegistration(UUID appCaseId, String applicationId, String clusterId) {}
 
     record DriftTracker(Set<String> lastDriftedNodeIds, int consecutiveCount) {}

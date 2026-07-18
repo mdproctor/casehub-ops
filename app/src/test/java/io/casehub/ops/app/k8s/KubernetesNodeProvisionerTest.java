@@ -33,7 +33,7 @@ class KubernetesNodeProvisionerTest {
         var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
         var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
         var nodeId = NodeId.of("ops-prod:namespace");
-        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
 
         var handler = new StubHandler(NodeStatus.PRESENT);
@@ -54,7 +54,7 @@ class KubernetesNodeProvisionerTest {
         var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
         var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
         var nodeId = NodeId.of("ops-prod:namespace");
-        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
 
         var handler = new StubHandler(NodeStatus.PRESENT);
@@ -75,7 +75,7 @@ class KubernetesNodeProvisionerTest {
         var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
         var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
         var nodeId = NodeId.of("ops-prod:namespace");
-        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
 
         var handler = new StubHandler(NodeStatus.PRESENT) {
@@ -148,7 +148,7 @@ class KubernetesNodeProvisionerTest {
         var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
         var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
         var nodeId = NodeId.of("ops-prod:namespace");
-        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
 
         java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
@@ -178,7 +178,7 @@ class KubernetesNodeProvisionerTest {
         var nsSpec = new K8sNamespaceSpec("casehub", Labels.of(Map.of()));
         var wrappedSpec = new InfraDesiredNodeSpec(nsSpec, "kubernetes:ops-prod");
         var nodeId = NodeId.of("ops-prod:namespace");
-        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, false);
+        var node = new DesiredNode(nodeId, ApplicationNodeTypes.K8S_NAMESPACE, wrappedSpec, io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphFactory.of(List.of(node), List.of());
 
         java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();

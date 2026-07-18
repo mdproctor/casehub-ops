@@ -33,7 +33,7 @@ public final class ApplicationCaseDescriptor {
                 childCaseBinding("on-incident-detected", ".incidentDetected",
                         "ops", "incident-response", "1.0", ".incidentData"),
                 childCaseBinding("on-scaling-required", ".scalingRequired",
-                        "ops", "scaling-event", "1.0", ".scalingSpec"),
+                        "ops", "scaling-event", "1.0", ".scalingRequired"),
                 childCaseBinding("on-compliance-violation", ".complianceViolation",
                         "ops", "compliance-remediation", "1.0", ".violationData"));
     }

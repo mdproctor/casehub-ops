@@ -68,7 +68,7 @@ public class DeploymentGoalCompiler implements GoalCompiler<DeploymentGoals> {
         for (var entry : entries) {
             var spec = entry.spec();
             nodes.add(new DesiredNode(
-                    NodeId.of(spec.nodeId()), NodeType.of(spec.nodeType()), spec, false));
+                    NodeId.of(spec.nodeId()), NodeType.of(spec.nodeType()), spec, io.casehub.desiredstate.api.HumanGating.NONE));
             for (String dep : entry.dependsOn()) {
                 deps.add(new Dependency(NodeId.of(spec.nodeId()), NodeId.of(dep)));
             }

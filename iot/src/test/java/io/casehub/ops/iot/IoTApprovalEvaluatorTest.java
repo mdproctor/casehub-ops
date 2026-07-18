@@ -17,7 +17,7 @@ class IoTApprovalEvaluatorTest {
     @Test
     void physicalDeviceAutoApproves() {
         var spec = new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Living Room Thermostat");
-        var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"), spec, true);
+        var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"), spec, io.casehub.desiredstate.api.HumanGating.ALL);
 
         var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
 
@@ -27,7 +27,7 @@ class IoTApprovalEvaluatorTest {
     @Test
     void deviceConfigAutoApproves() {
         var spec = new DeviceConfigSpec("dev-1", DeviceClass.SWITCH, Map.of("isOn", true));
-        var node = new DesiredNode(NodeId.of("dev-1-config"), NodeType.of("device-config"), spec, false);
+        var node = new DesiredNode(NodeId.of("dev-1-config"), NodeType.of("device-config"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
 
         var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
 
@@ -36,8 +36,8 @@ class IoTApprovalEvaluatorTest {
 
     @Test
     void deprovisionAutoApproves() {
-        var spec = new DeviceConfigSpec("dev-1", DeviceClass.SWITCH, Map.of("isOn", false));
-        var node = new DesiredNode(NodeId.of("dev-1-config"), NodeType.of("device-config"), spec, false);
+        var spec = new DeviceConfigSpec("dev-1", DeviceClass.SWITCH, Map.of("isOn", io.casehub.desiredstate.api.HumanGating.NONE));
+        var node = new DesiredNode(NodeId.of("dev-1-config"), NodeType.of("device-config"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
 
         var decision = evaluator.evaluate(node, StepAction.DEPROVISION, "tenant-1");
 
@@ -47,7 +47,7 @@ class IoTApprovalEvaluatorTest {
     @Test
     void nonIoTSpecAutoApproves() {
         NodeSpec unknownSpec = new NodeSpec() {};
-        var node = new DesiredNode(NodeId.of("x-1"), NodeType.of("unknown"), unknownSpec, false);
+        var node = new DesiredNode(NodeId.of("x-1"), NodeType.of("unknown"), unknownSpec, io.casehub.desiredstate.api.HumanGating.NONE);
 
         var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
 

@@ -197,7 +197,7 @@ class UpdateServiceReplicasTest {
             if (sd.serviceId().equals(serviceId)) {
                 found = true;
                 updated.add(new ServiceDefinition(sd.serviceId(), sd.name(), sd.image(), newReplicas,
-                        sd.ports(), sd.env(), sd.resources(), sd.dependsOn(), sd.healthCheck(), sd.targetClusters()));
+                        sd.ports(), sd.env(), sd.resources(), sd.dependsOn(), sd.healthCheck(), sd.targetClusters(), sd.scalingRules()));
             } else {
                 updated.add(sd);
             }

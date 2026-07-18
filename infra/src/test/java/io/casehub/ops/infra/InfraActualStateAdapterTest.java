@@ -39,7 +39,7 @@ class InfraActualStateAdapterTest {
     private DesiredNode infraNode(String id, String backendId) {
         var spec = new K8sNamespaceSpec(id, Labels.empty());
         return new DesiredNode(NodeId.of(id), NodeType.of("k8s_namespace"),
-                               new InfraDesiredNodeSpec(spec, backendId), false);
+                               new InfraDesiredNodeSpec(spec, backendId), io.casehub.desiredstate.api.HumanGating.NONE);
     }
 
     // --- helpers ---
@@ -126,7 +126,7 @@ class InfraActualStateAdapterTest {
 
         var spec = new K8sNamespaceSpec("prod-ns", Labels.empty());
         var node = new DesiredNode(NodeId.of("ns-1"), NodeType.of("k8s_namespace"),
-                                   new InfraDesiredNodeSpec(spec, "standalone"), false);
+                                   new InfraDesiredNodeSpec(spec, "standalone"), io.casehub.desiredstate.api.HumanGating.NONE);
         var graph = graphOf(node);
 
         adapter.readActual(graph, "tenant-1");

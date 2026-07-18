@@ -96,7 +96,7 @@ class AdaptationRuleTest {
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
             originalSpec,
-            false
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(node), List.of());
         var situation = new ActiveSituation("policy-change", "_singleton", "test", 0.9, Map.of(), Instant.now(), Instant.now(), 0);
@@ -165,8 +165,8 @@ class AdaptationRuleTest {
         var policyNode = new DesiredNode(
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
-            new TrustPolicyNodeSpec("risk-assessment", 0.7, 10, 0.05, 0.6, Map.of(), false),
-            false
+            new TrustPolicyNodeSpec("risk-assessment", 0.7, 10, 0.05, 0.6, Map.of(), true),
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(baseNode, policyNode), List.of());
 
@@ -200,8 +200,8 @@ class AdaptationRuleTest {
         var policyNode = new DesiredNode(
             NodeId.of("risk-policy"),
             NodeType.of("trust_policy"),
-            new TrustPolicyNodeSpec("risk-assessment", 0.7, 10, 0.05, 0.6, Map.of(), false),
-            false
+            new TrustPolicyNodeSpec("risk-assessment", 0.7, 10, 0.05, 0.6, Map.of(), true),
+            io.casehub.desiredstate.api.HumanGating.NONE
         );
         var graph = factory.of(List.of(baseNode, policyNode), List.of());
         var situation = new ActiveSituation("combined", "_singleton", "test", 1.0, Map.of(), Instant.now(), Instant.now(), 0);
@@ -230,6 +230,6 @@ class AdaptationRuleTest {
             null, null, null, null,
             List.of(), null, null, null, null, List.of()
         );
-        return new DesiredNode(NodeId.of(agentId), NodeType.of("agent"), spec, false);
+        return new DesiredNode(NodeId.of(agentId), NodeType.of("agent"), spec, io.casehub.desiredstate.api.HumanGating.NONE);
     }
 }

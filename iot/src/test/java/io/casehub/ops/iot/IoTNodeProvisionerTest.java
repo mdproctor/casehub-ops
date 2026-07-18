@@ -99,7 +99,7 @@ class IoTNodeProvisionerTest {
     void physicalProvision_rejectedAsUnknownSpec() {
         var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
         var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"),
-            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), false);
+            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), io.casehub.desiredstate.api.HumanGating.NONE);
         var result = provisioner.provision(node, context());
 
         assertThat(result).isInstanceOf(ProvisionResult.Failed.class);
@@ -118,7 +118,7 @@ class IoTNodeProvisionerTest {
     void physicalDeprovision_returnsSuccess() {
         var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
         var node = new DesiredNode(NodeId.of("dev-1"), NodeType.of("physical-device"),
-            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), false);
+            new PhysicalDeviceSpec("dev-1", DeviceClass.THERMOSTAT, "Label"), io.casehub.desiredstate.api.HumanGating.NONE);
         var result = provisioner.deprovision(node, deprovisionContext());
 
         assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
@@ -151,7 +151,7 @@ class IoTNodeProvisionerTest {
 
     private DesiredNode configNode(String id, DeviceClass dc, Map<String, Object> caps) {
         return new DesiredNode(NodeId.of(id + "-config"), NodeType.of("device-config"),
-            new DeviceConfigSpec(id, dc, caps), false);
+            new DeviceConfigSpec(id, dc, caps), io.casehub.desiredstate.api.HumanGating.NONE);
     }
 
     private ProvisionContext context() {

@@ -102,7 +102,7 @@ class IoTActualStateAdapterTest {
         return FACTORY.of(
             List.of(new DesiredNode(NodeId.of(deviceId + "-config"),
                 NodeType.of("device-config"),
-                new DeviceConfigSpec(deviceId, dc, caps), false)),
+                new DeviceConfigSpec(deviceId, dc, caps), io.casehub.desiredstate.api.HumanGating.NONE)),
             List.of());
     }
 
@@ -110,7 +110,7 @@ class IoTActualStateAdapterTest {
         return FACTORY.of(
             List.of(new DesiredNode(NodeId.of(deviceId),
                 NodeType.of("physical-device"),
-                new PhysicalDeviceSpec(deviceId, dc, "Label"), true)),
+                new PhysicalDeviceSpec(deviceId, dc, "Label"), io.casehub.desiredstate.api.HumanGating.ALL)),
             List.of());
     }
 
