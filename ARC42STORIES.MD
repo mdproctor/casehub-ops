@@ -94,7 +94,7 @@ What casehub-ops does NOT do:
 
 - Run the reconciliation loop — `casehub-desiredstate` owns that
 - Store persistent state — domain modules use in-memory stores or delegate to foundation modules
-- Expose REST APIs — domain modules are injectable CDI beans, not endpoints
+- Expose REST APIs — domain modules are injectable CDI beans, not endpoints. The `app/` module (not a domain module) exposes REST endpoints for operational concerns like approval workflow and scaling triggers.
 - Define the generic SPI contracts — `casehub-desiredstate-api` owns GoalCompiler, NodeProvisioner, etc.
 
 ---
@@ -173,7 +173,7 @@ C4Container
 
 | Module | Artifact | Package root | Purpose |
 |---|---|---|---|
-| `api/` | `casehub-ops-api` | `io.casehub.ops.api` | Shared types across all domains |
+| `api/` | `casehub-ops-api` | `io.casehub.ops.api` | Shared types across all domains + approval workflow SPIs |
 | `infra/` | `casehub-ops-infra` | `io.casehub.ops.infra` | Infrastructure provisioning — PoC |
 | `deployment/` | `casehub-ops-deployment` | `io.casehub.ops.deployment` | CaseHub agent topology — primary |
 | `compliance/` | `casehub-ops-compliance` | `io.casehub.ops.compliance` | Compliance posture — largest market gap |
@@ -255,6 +255,30 @@ Normalization rules:
 
 The normalizer is stateless and applied on both sides of the comparison — `CapabilityNormalizer.normalize()` in `IoTActualStateAdapter` and `IoTNodeProvisioner`.
 
+### Approval Workflow
+
+High-risk provisioning operations require human approval before execution. The workflow spans `api/approval/` (SPIs) and `app/` (K8s-specific implementation), backed by `casehub-work` WorkItems.
+
+Three SPIs in `api/approval/`:
+
+| SPI | Responsibility |
+|---|---|
+| `ApprovalEvaluator` | Classifies risk for a `(DesiredNode, StepAction)` pair and returns `AutoApproved` or `RequiresApproval(ApprovalPlan)` |
+| `PlanStore` | Persists `ApprovalPlan` for re-entry — the provisioner returns `PendingApproval`, and when the approval arrives the plan is retrieved to resume |
+| `ApprovalAuthorizer` | Role-based gate: checks whether an actor has sufficient roles to approve/reject at the given `RiskClassification` |
+
+**Risk classification** uses a four-level enum (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`). `ApprovalThresholds` defines the cutoff — operations below the threshold are auto-approved. `K8sApprovalEvaluator` classifies by resource type × action (namespace deletion = CRITICAL, deployment deletion = HIGH) then elevates based on namespace context: configurable critical-namespace and production-namespace lists raise the floor to CRITICAL or HIGH respectively.
+
+**Provisioner integration pattern:**
+1. Provisioner calls `ApprovalEvaluator.evaluate()` before provisioning
+2. If `RequiresApproval` → store the plan via `PlanStore`, return `PendingApproval` to the runtime
+3. Runtime creates a `desiredstate-approval` WorkItem with the plan reference as payload
+4. Human approves/rejects via `ApprovalResource` REST API (role-gated by `ApprovalAuthorizer`)
+5. On approval → `EventSource.emitDrift()` triggers immediate reconciliation
+6. Re-entry: provisioner checks `context.hasApproval()`, retrieves the stored plan, verifies the spec hasn't changed since approval (stale-spec detection), then proceeds or re-evaluates
+
+**Persistent storage:** `JpaPlanStore` + `ApprovalPlanEntity` (Flyway V5). `ApprovalPlan` contains the `originalSpec` (polymorphic `NodeSpec`), serialized via Jackson mixins in `PlanStoreMapper` — mixins avoid polluting domain types with serialization annotations.
+
 ### Anti-patterns
 
 **Symptom:** CDI ambiguity errors at startup — multiple beans of type `GoalCompiler`, `NodeProvisioner`, etc.
@@ -264,6 +288,10 @@ The normalizer is stateless and applied on both sides of the comparison — `Cap
 **Symptom:** Drift detected but node never re-provisioned — DRIFTED status appears in logs but no transition is planned.
 **Cause:** `TransitionPlanner` in `casehub-desiredstate` previously had no code path for `DRIFTED` — it handled `ABSENT`/`UNKNOWN` → PROVISION and `PRESENT`-not-in-desired → DEPROVISION only.
 **Fix:** Fixed in casehubio/casehub-desiredstate#38 — `TransitionPlanner.plan()` now treats DRIFTED like ABSENT (`case DRIFTED, ABSENT, UNKNOWN -> true` in the provision switch). Config drift self-healing works for all domain modules.
+
+**Symptom:** Approved operation executes against a stale spec — the desired state changed between approval request and approval grant.
+**Cause:** Between the approval request and human approval, the YAML declaration was updated. The provisioner proceeds with the now-outdated plan.
+**Fix:** On re-entry, the provisioner compares `plan.originalSpec()` against the current `node.spec()`. If they differ, the stored plan is discarded and risk is re-evaluated against the new spec. A new approval may be required.
 
 **Symptom:** `AgentCapability` constructor call fails with wrong argument count after eidos API update.
 **Cause:** eidos added a new field (`excludedDomains`) to `AgentCapability`. Binary incompatibility — existing code compiles against old API but fails at runtime.
@@ -802,6 +830,7 @@ Sparse — most decisions are documented inline in the layer entries above. Cros
 | Passive EventSource in infra, compliance, iot | C1, C3, C4 | Active Watch now in app (C2); other modules pending when needed |
 | In-memory SpecHashStore | C2 deployment, C3 compliance | Persistent store if restart-resilient hash tracking needed |
 | Case type drift always PRESENT | C2 deployment | `CaseDefinitionRegistry.findByIdentity()` SPI change needed |
+| Jackson mixin coupling in PlanStoreMapper | #43 approval workflow | If new `NodeSpec` or `InfraNodeSpec` subtypes are added, `PlanStoreMapper` mixin annotations must be updated or deserialization fails silently |
 
 ---
 
