@@ -1,10 +1,17 @@
 package io.casehub.ops.app.rest;
 
-import io.casehub.desiredstate.api.NodeId;
+import io.casehub.ops.api.approval.ApprovalAuthorizer;
 import io.casehub.ops.api.approval.ApprovalPlan;
 import io.casehub.ops.api.approval.PlanStore;
 import io.casehub.ops.api.approval.RiskClassification;
-import io.casehub.ops.api.infra.*;
+import io.casehub.platform.api.identity.CurrentPrincipal;
+import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
+import io.casehub.ops.api.infra.InfraNodeSpec;
+import io.casehub.ops.api.infra.K8sConfigMapSpec;
+import io.casehub.ops.api.infra.K8sDeploymentSpec;
+import io.casehub.ops.api.infra.K8sIngressSpec;
+import io.casehub.ops.api.infra.K8sNamespaceSpec;
+import io.casehub.ops.api.infra.K8sServiceSpec;
 import io.casehub.ops.app.k8s.KubernetesEventSource;
 import io.casehub.work.runtime.model.WorkItem;
 import io.casehub.work.runtime.repository.WorkItemQuery;
@@ -12,14 +19,18 @@ import io.casehub.work.runtime.service.WorkItemService;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.*;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 
 @Blocking
@@ -32,14 +43,20 @@ public class ApprovalResource {
     private final WorkItemService       workItemService;
     private final PlanStore             planStore;
     private final KubernetesEventSource eventSource;
+    private final ApprovalAuthorizer    authorizer;
+    private final CurrentPrincipal      principal;
 
     @Inject
     public ApprovalResource(WorkItemService workItemService,
                             PlanStore planStore,
-                            KubernetesEventSource eventSource) {
+                            KubernetesEventSource eventSource,
+                            ApprovalAuthorizer authorizer,
+                            CurrentPrincipal principal) {
         this.workItemService = workItemService;
         this.planStore       = planStore;
         this.eventSource     = eventSource;
+        this.authorizer      = authorizer;
+        this.principal       = principal;
     }
 
     @GET
@@ -75,6 +92,14 @@ public class ApprovalResource {
         if (item == null) {return Response.status(Response.Status.NOT_FOUND).build();}
         if (!tenancyId.equals(item.tenancyId)) {return Response.status(Response.Status.FORBIDDEN).build();}
 
+        RiskClassification risk       = resolveRisk(item);
+        var                authResult = authorizer.authorize(risk, request.actorId(), principal.roles());
+        if (authResult instanceof ApprovalAuthorizer.AuthorizationResult.Denied denied) {
+            return Response.status(Response.Status.FORBIDDEN)
+                           .entity(java.util.Map.of("error", denied.reason()))
+                           .build();
+        }
+
         workItemService.completeFromSystem(id, request.actorId(), "approve");
 
         if (item.payload != null) {
@@ -95,13 +120,28 @@ public class ApprovalResource {
         if (item == null) {return Response.status(Response.Status.NOT_FOUND).build();}
         if (!tenancyId.equals(item.tenancyId)) {return Response.status(Response.Status.FORBIDDEN).build();}
 
+        RiskClassification risk       = resolveRisk(item);
+        var                authResult = authorizer.authorize(risk, request.actorId(), principal.roles());
+        if (authResult instanceof ApprovalAuthorizer.AuthorizationResult.Denied denied) {
+            return Response.status(Response.Status.FORBIDDEN)
+                           .entity(java.util.Map.of("error", denied.reason()))
+                           .build();
+        }
+
         workItemService.rejectFromSystem(id, request.actorId(), request.reason());
         return Response.accepted().build();
     }
 
+    private RiskClassification resolveRisk(WorkItem item) {
+        if (item.payload == null) {return RiskClassification.LOW;}
+        return planStore.retrieve(item.payload)
+                        .map(ApprovalPlan::risk)
+                        .orElse(RiskClassification.LOW);
+    }
+
     private ApprovalView toView(WorkItem item) {
         var planOpt = item.payload != null
-                      ? planStore.retrieve(item.payload) : Optional.<ApprovalPlan>empty();
+                      ? planStore.retrieve(item.payload) : java.util.Optional.<ApprovalPlan>empty();
         if (planOpt.isPresent()) {
             var    plan      = planOpt.get();
             String cluster   = null;

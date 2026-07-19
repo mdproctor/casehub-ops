@@ -1,11 +1,12 @@
 package io.casehub.ops.api.approval;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import jakarta.enterprise.context.ApplicationScoped;
-
+@io.quarkus.arc.DefaultBean
 @ApplicationScoped
 public class InMemoryPlanStore implements PlanStore {
 

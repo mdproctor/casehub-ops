@@ -1,8 +1,18 @@
 package io.casehub.ops.app.k8s;
 
-import io.casehub.desiredstate.api.*;
-import io.casehub.ops.api.approval.*;
-import io.casehub.ops.api.infra.*;
+import io.casehub.desiredstate.api.DesiredNode;
+import io.casehub.desiredstate.api.HumanGating;
+import io.casehub.desiredstate.api.NodeId;
+import io.casehub.desiredstate.api.NodeSpec;
+import io.casehub.desiredstate.api.NodeType;
+import io.casehub.desiredstate.api.StepAction;
+import io.casehub.ops.api.approval.ApprovalDecision;
+import io.casehub.ops.api.approval.RiskClassification;
+import io.casehub.ops.api.infra.InfraDesiredNodeSpec;
+import io.casehub.ops.api.infra.K8sConfigMapSpec;
+import io.casehub.ops.api.infra.K8sDeploymentSpec;
+import io.casehub.ops.api.infra.K8sNamespaceSpec;
+import io.casehub.ops.api.infra.K8sServiceSpec;
 import io.casehub.ops.api.infra.types.Labels;
 import io.casehub.ops.api.infra.types.ResourceRequirements;
 import io.casehub.ops.api.infra.types.ServiceType;
@@ -134,4 +144,77 @@ class K8sApprovalEvaluatorTest {
                 .contains("prod/api-server")
                 .contains("kubernetes:ops-prod");
     }
+
+    @Test
+    void deploymentProvision_inProductionNamespace_isElevatedToHigh() {
+        var evaluator = new K8sApprovalEvaluator(
+                java.util.Set.of(), java.util.Set.of("production", "prod"));
+        var spec = new InfraDesiredNodeSpec(
+                new K8sDeploymentSpec("production", "web", "app:2.0", 2,
+                                      new ResourceRequirements("100m", "200m", "128Mi", "256Mi"),
+                                      Labels.empty()),
+                "kubernetes:ops-prod");
+        var node = new DesiredNode(NodeId.of("dep-ctx-1"),
+                                   ApplicationNodeTypes.K8S_DEPLOYMENT, spec, HumanGating.NONE);
+
+        var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
+
+        assertThat(decision).isInstanceOf(ApprovalDecision.RequiresApproval.class);
+        var req = (ApprovalDecision.RequiresApproval) decision;
+        assertThat(req.plan().risk()).isEqualTo(RiskClassification.HIGH);
+    }
+
+    @Test
+    void deploymentDeprovision_inCriticalNamespace_isElevatedToCritical() {
+        var evaluator = new K8sApprovalEvaluator(
+                java.util.Set.of("kube-system", "istio-system"), java.util.Set.of());
+        var spec = new InfraDesiredNodeSpec(
+                new K8sDeploymentSpec("kube-system", "coredns", "coredns:1.11", 2,
+                                      new ResourceRequirements("100m", "200m", "128Mi", "256Mi"),
+                                      Labels.empty()),
+                "kubernetes:ops-prod");
+        var node = new DesiredNode(NodeId.of("dep-ctx-2"),
+                                   ApplicationNodeTypes.K8S_DEPLOYMENT, spec, HumanGating.NONE);
+
+        var decision = evaluator.evaluate(node, StepAction.DEPROVISION, "tenant-1");
+
+        assertThat(decision).isInstanceOf(ApprovalDecision.RequiresApproval.class);
+        var req = (ApprovalDecision.RequiresApproval) decision;
+        assertThat(req.plan().risk()).isEqualTo(RiskClassification.CRITICAL);
+    }
+
+    @Test
+    void serviceProvision_inDevNamespace_usesBaseClassification() {
+        var evaluator = new K8sApprovalEvaluator(
+                java.util.Set.of("kube-system"), java.util.Set.of("production"));
+        var spec = new InfraDesiredNodeSpec(
+                new K8sServiceSpec("dev", "my-svc", 80, 8080,
+                                   ServiceType.CLUSTER_IP, Labels.empty(), Labels.empty()),
+                "kubernetes:ops-dev");
+        var node = new DesiredNode(NodeId.of("svc-ctx-1"),
+                                   ApplicationNodeTypes.K8S_SERVICE, spec, HumanGating.NONE);
+
+        var decision = evaluator.evaluate(node, StepAction.PROVISION, "tenant-1");
+
+        assertThat(decision).isInstanceOf(ApprovalDecision.AutoApproved.class);
+    }
+
+    @Test
+    void namespaceDeprovision_criticalByName_remainsCritical() {
+        var evaluator = new K8sApprovalEvaluator(
+                java.util.Set.of("prod-billing"), java.util.Set.of());
+        var spec = new InfraDesiredNodeSpec(
+                new K8sNamespaceSpec("prod-billing", Labels.empty()),
+                "kubernetes:ops-prod");
+        var node = new DesiredNode(NodeId.of("ns-ctx-1"),
+                                   ApplicationNodeTypes.K8S_NAMESPACE, spec, HumanGating.NONE);
+
+        var decision = evaluator.evaluate(node, StepAction.DEPROVISION, "tenant-1");
+
+        assertThat(decision).isInstanceOf(ApprovalDecision.RequiresApproval.class);
+        var req = (ApprovalDecision.RequiresApproval) decision;
+        assertThat(req.plan().risk()).isEqualTo(RiskClassification.CRITICAL);
+    }
+
+
 }
