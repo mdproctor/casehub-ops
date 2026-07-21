@@ -1,7 +1,16 @@
 package io.casehub.ops.compliance;
 
-import io.casehub.desiredstate.api.*;
-import io.casehub.ops.api.approval.*;
+import io.casehub.desiredstate.api.DeprovisionContext;
+import io.casehub.desiredstate.api.DeprovisionResult;
+import io.casehub.desiredstate.api.DesiredNode;
+import io.casehub.desiredstate.api.NodeProvisioner;
+import io.casehub.desiredstate.api.NodeType;
+import io.casehub.desiredstate.api.ProvisionContext;
+import io.casehub.desiredstate.api.ProvisionResult;
+import io.casehub.desiredstate.api.StepAction;
+import io.casehub.ops.api.approval.ApprovalDecision;
+import io.casehub.ops.api.approval.ApprovalEvaluator;
+import io.casehub.ops.api.approval.PlanStore;
 import io.casehub.ops.api.compliance.ComplianceControlSpec;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -21,11 +30,11 @@ public class ComplianceNodeProvisioner implements NodeProvisioner {
             NodeType.of("CERTIFICATE_EXPIRY"),
             NodeType.of("CONFIG_HASH"));
 
-    private final ComplianceEvidenceService evidenceService;
+    private final ComplianceEvidenceService   evidenceService;
     private final ComplianceFrameworkRegistry registry;
-    private final ComplianceSpecHashStore specHashStore;
-    private final ApprovalEvaluator approvalEvaluator;
-    private final PlanStore planStore;
+    private final ComplianceSpecHashStore     specHashStore;
+    private final ApprovalEvaluator           approvalEvaluator;
+    private final PlanStore                   planStore;
 
     @Inject
     public ComplianceNodeProvisioner(
@@ -34,17 +43,23 @@ public class ComplianceNodeProvisioner implements NodeProvisioner {
             ComplianceSpecHashStore specHashStore,
             ApprovalEvaluator approvalEvaluator,
             PlanStore planStore) {
-        this.evidenceService = evidenceService;
-        this.registry = registry;
-        this.specHashStore = specHashStore;
+        this.evidenceService   = evidenceService;
+        this.registry          = registry;
+        this.specHashStore     = specHashStore;
         this.approvalEvaluator = approvalEvaluator;
-        this.planStore = planStore;
+        this.planStore         = planStore;
     }
 
     @Override
     public Set<NodeType> handledTypes() {
         return HANDLED_TYPES;
     }
+
+    @Override
+    public java.time.Duration resyncInterval() {
+        return java.time.Duration.ofHours(1);
+    }
+
 
     @Override
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {

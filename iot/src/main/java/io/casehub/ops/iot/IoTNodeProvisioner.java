@@ -12,7 +12,9 @@ import io.casehub.iot.api.CommandResult;
 import io.casehub.iot.api.DeviceCommand;
 import io.casehub.iot.api.spi.DeviceProvider;
 import io.casehub.iot.api.spi.DeviceRegistry;
-import io.casehub.ops.api.approval.*;
+import io.casehub.ops.api.approval.ApprovalDecision;
+import io.casehub.ops.api.approval.ApprovalEvaluator;
+import io.casehub.ops.api.approval.PlanStore;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.PhysicalDeviceSpec;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,36 +34,34 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     private static final String DISPATCHED_BY = "casehub-ops-iot-provisioner";
 
-    private final DeviceRegistry registry;
+    private final DeviceRegistry              registry;
     private final Map<String, DeviceProvider> providers;
-    private final ApprovalEvaluator approvalEvaluator;
-    private final PlanStore planStore;
+    private final ApprovalEvaluator           approvalEvaluator;
+    private final PlanStore                   planStore;
 
     @Inject
     public IoTNodeProvisioner(DeviceRegistry registry,
-                               @Any Instance<DeviceProvider> providerBeans,
-                               ApprovalEvaluator approvalEvaluator,
-                               PlanStore planStore) {
-        this.registry = registry;
+                              @Any Instance<DeviceProvider> providerBeans,
+                              ApprovalEvaluator approvalEvaluator,
+                              PlanStore planStore) {
+        this.registry  = registry;
         this.providers = new HashMap<>();
         providerBeans.forEach(p -> providers.put(p.providerId(), p));
         this.approvalEvaluator = approvalEvaluator;
-        this.planStore = planStore;
+        this.planStore         = planStore;
     }
 
     IoTNodeProvisioner(DeviceRegistry registry, List<DeviceProvider> providerList,
-                        ApprovalEvaluator approvalEvaluator, PlanStore planStore) {
-        this.registry = registry;
+                       ApprovalEvaluator approvalEvaluator, PlanStore planStore) {
+        this.registry  = registry;
         this.providers = new HashMap<>();
         providerList.forEach(p -> providers.put(p.providerId(), p));
         this.approvalEvaluator = approvalEvaluator;
-        this.planStore = planStore;
+        this.planStore         = planStore;
     }
 
     @Override
-    public Set<NodeType> handledTypes() {
-        return Set.of(NodeType.of("physical-device"), NodeType.of("device-config"));
-    }
+    public Set<NodeType> handledTypes() {return Set.of(NodeType.of("physical-device"), NodeType.of("device-config"), NodeType.of("iot-review"));}
 
     @Override
     public Duration resyncInterval() {
@@ -70,6 +70,9 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     @Override
     public ProvisionResult provision(DesiredNode node, ProvisionContext context) {
+        if (node.spec() instanceof io.casehub.ops.api.iot.IoTReviewSpec) {
+            return new ProvisionResult.Success();
+        }
         if (!(node.spec() instanceof DeviceConfigSpec)) {
             return new ProvisionResult.Failed("unknown spec type: " + node.spec().getClass());
         }
@@ -89,6 +92,9 @@ public class IoTNodeProvisioner implements NodeProvisioner {
 
     @Override
     public DeprovisionResult deprovision(DesiredNode node, DeprovisionContext context) {
+        if (node.spec() instanceof io.casehub.ops.api.iot.IoTReviewSpec) {
+            return new DeprovisionResult.Success();
+        }
         if (!(node.spec() instanceof PhysicalDeviceSpec || node.spec() instanceof DeviceConfigSpec)) {
             return new DeprovisionResult.Failed("unknown spec type: " + node.spec().getClass());
         }
@@ -192,24 +198,24 @@ public class IoTNodeProvisioner implements NodeProvisioner {
         var provider = providers.get(device.providerId());
         if (provider == null) {
             return new ProvisionResult.Failed(
-                "no provider for '" + device.providerId() + "'");
+                    "no provider for '" + device.providerId() + "'");
         }
 
-        var actualNorm = CapabilityNormalizer.normalize(device.capabilities());
+        var actualNorm  = CapabilityNormalizer.normalize(device.capabilities());
         var desiredNorm = CapabilityNormalizer.normalize(spec.desiredCapabilities());
         var ctx = new CapabilityCommandMapper.CommandContext(
-            DISPATCHED_BY, UUID.randomUUID().toString());
+                DISPATCHED_BY, UUID.randomUUID().toString());
 
         for (var entry : desiredNorm.entrySet()) {
             Object actualVal = actualNorm.get(entry.getKey());
             if (!entry.getValue().equals(actualVal)) {
                 DeviceCommand cmd = CapabilityCommandMapper.toCommand(
-                    spec.deviceId(), entry.getKey(),
-                    spec.desiredCapabilities().get(entry.getKey()), ctx);
+                        spec.deviceId(), entry.getKey(),
+                        spec.desiredCapabilities().get(entry.getKey()), ctx);
                 CommandResult result = provider.dispatch(cmd).await().indefinitely();
                 if (result != CommandResult.SENT) {
                     return new ProvisionResult.Failed(
-                        "command " + cmd.action() + " returned " + result);
+                            "command " + cmd.action() + " returned " + result);
                 }
             }
         }

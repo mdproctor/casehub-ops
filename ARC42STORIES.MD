@@ -644,8 +644,8 @@ Sealed type dispatch with handler delegation — exhaustive `switch` on the seal
 **Participates in chapters:** C3
 **Architectural patterns:** Generic spec with discriminator, evidence-based drift, ledger integration, two-layer drift detection
 **Design refs:** `docs/superpowers/specs/2026-06-18-compliance-posture-domain-design.md`
-**Issues:** #3
-**Navigation:** `git log --grep="#3" --oneline`
+**Issues:** #3, #21
+**Navigation:** `git log --grep="#3\|#21" --oneline`
 **Blog:** `2026-06-18-mdp01-compliance-posture-desired-state.md`
 **Completed:** 2026-06-18
 
@@ -658,6 +658,7 @@ What this layer adds:
 - **Two-layer drift detection** — Layer 1: evidence staleness (older than `evidenceMaxAgeDays`) or outcome (FAIL/UNAVAILABLE). Layer 2: spec hash drift (declaration changed since last provision). Either triggers re-provisioning.
 - **Five-category posture model** — passing, failing, unavailable, stale, missing. An auditor distinguishes confirmed compliance gaps (failing) from unverifiable states (unavailable) and evidence decay (stale).
 - **Evidence as ledger entries** — `ComplianceLedgerEntry extends LedgerEntry` with JOINED inheritance, Flyway V2000 migration, deterministic `subjectId` from controlId. Each control forms its own Merkle chain.
+- **Domain-specific resync interval** — `ComplianceNodeProvisioner.resyncInterval()` returns 1 hour. Evidence staleness is measured in days (`evidenceMaxAgeDays`), not minutes — a 1-hour resync catches drift without wasting cycles re-evaluating evidence valid for days.
 
 Not closed here: Real `EvidenceCollector` implementations (stubs only), dimension C (policy-document tracking), REST API for posture queries, fault escalation beyond no-op.
 
@@ -721,8 +722,8 @@ Evidence-based compliance posture — evidence collection as provisioning, evide
 **Participates in chapters:** C4
 **Architectural patterns:** Sealed type dispatch, two-node-type model, capability normalization, provider routing
 **Design refs:** `docs/superpowers/specs/2026-06-24-iot-desired-state-design.md`
-**Issues:** #4
-**Navigation:** `git log --grep="#4" --oneline`
+**Issues:** #4, #10
+**Navigation:** `git log --grep="#4\|#10" --oneline`
 **Blog:** `2026-06-25-mdp01-iot-desired-state-type-boundary.md`
 **Completed:** 2026-06-25
 
@@ -736,7 +737,9 @@ What this layer adds:
 - **Capability normalization** — `CapabilityNormalizer` normalizes both desired and actual sides to a common representation (BigDecimal for numerics, String for enums, recursive Map normalization for Temperature). Ensures comparison works across YAML parsing types and IoT API types.
 - **Provider routing** — `IoTNodeProvisioner` resolves `DeviceProvider` by `providerId()` from the device registry, dispatches `DeviceCommand`s for each drifted capability.
 
-Not closed here: `IoTFaultPolicy` is no-op (needs operational feedback — #10). `requiresHuman=true` nodes use `HumanNodeHandler` for WorkItem creation (casehubio/casehub-desiredstate#43 — shipped).
+- **Fault policy escalation** — `IoTFaultPolicy` tracks `PROVISION_FAILED` counts per device-config node. After 3 consecutive failures, adds an `iot-review` node (`HumanGating.ALL`) to the graph — the runtime creates a WorkItem for human investigation. Guards against infinite regress by ignoring faults on review nodes. `IoTReviewSpec` in `api/iot/` carries the faulted node reference and failure reason. `IoTNodeProvisioner` handles `iot-review` as a no-op Success — the review is complete once the human approves the WorkItem.
+
+Not closed here: `requiresHuman=true` nodes use `HumanNodeHandler` for WorkItem creation (casehubio/casehub-desiredstate#43 — shipped).
 
 #### Key files
 
@@ -747,7 +750,8 @@ Not closed here: `IoTFaultPolicy` is no-op (needs operational feedback — #10).
 - `iot/.../CapabilityNormalizer.java` — BigDecimal/enum/Temperature normalization with recursive Map handling
 - `iot/.../CapabilityCommandMapper.java` — capability key+value → DeviceCommand with CommandContext
 - `iot/.../IoTEventSource.java` — CDI async observer bridge: StateChangeEvent/ProviderStatusEvent → StateEvent stream
-- `iot/.../IoTFaultPolicy.java` — no-op placeholder pending operational feedback
+- `iot/.../IoTFaultPolicy.java` — fault-count escalation: 3 PROVISION_FAILED → AddNode(iot-review, HumanGating.ALL)
+- `api/.../iot/IoTReviewSpec.java` — review node spec carrying faulted node reference and reason
 
 #### Key wiring
 

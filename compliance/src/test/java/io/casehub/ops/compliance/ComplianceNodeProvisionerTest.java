@@ -1,13 +1,25 @@
 package io.casehub.ops.compliance;
 
-import io.casehub.desiredstate.api.*;
+import io.casehub.desiredstate.api.DeprovisionContext;
+import io.casehub.desiredstate.api.DeprovisionResult;
+import io.casehub.desiredstate.api.DesiredNode;
+import io.casehub.desiredstate.api.NodeId;
+import io.casehub.desiredstate.api.NodeSpec;
+import io.casehub.desiredstate.api.NodeType;
+import io.casehub.desiredstate.api.ProvisionContext;
+import io.casehub.desiredstate.api.ProvisionResult;
 import io.casehub.desiredstate.runtime.DefaultDesiredStateGraphFactory;
 import io.casehub.ops.api.approval.InMemoryPlanStore;
-import io.casehub.ops.api.compliance.*;
+import io.casehub.ops.api.compliance.ComplianceControlSpec;
+import io.casehub.ops.api.compliance.EvidenceOutcome;
+import io.casehub.ops.api.compliance.EvidenceResult;
+import io.casehub.ops.api.compliance.FrameworkMapping;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import java.util.List;
 import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ComplianceNodeProvisionerTest {
@@ -99,4 +111,10 @@ class ComplianceNodeProvisionerTest {
         var result = provisioner.provision(node, new ProvisionContext("default", graphFactory.empty()));
         assertThat(result).isInstanceOf(ProvisionResult.Failed.class);
     }
+
+    @Test
+    void resyncInterval_returnsOneHour() {
+        assertThat(provisioner.resyncInterval()).isEqualTo(java.time.Duration.ofHours(1));
+    }
+
 }

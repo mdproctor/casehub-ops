@@ -12,10 +12,10 @@ import io.casehub.iot.api.CommandResult;
 import io.casehub.iot.api.DeviceClass;
 import io.casehub.iot.api.DeviceCommand;
 import io.casehub.iot.api.DeviceEntity;
+import io.casehub.iot.api.ProviderStatus;
 import io.casehub.iot.api.SwitchDevice;
 import io.casehub.iot.api.spi.DeviceProvider;
 import io.casehub.iot.api.spi.DeviceRegistry;
-import io.casehub.iot.api.ProviderStatus;
 import io.casehub.ops.api.approval.InMemoryPlanStore;
 import io.casehub.ops.api.iot.DeviceConfigSpec;
 import io.casehub.ops.api.iot.PhysicalDeviceSpec;
@@ -141,6 +141,33 @@ class IoTNodeProvisionerTest {
         assertThat(result).isInstanceOf(ProvisionResult.Failed.class);
         assertThat(((ProvisionResult.Failed) result).reason()).contains("no provider");
     }
+
+    @Test
+    void handledTypes_includesReviewType() {
+        var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
+        assertThat(provisioner.handledTypes()).contains(NodeType.of("iot-review"));
+    }
+
+    @Test
+    void reviewProvision_returnsSuccess() {
+        var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
+        var spec        = new io.casehub.ops.api.iot.IoTReviewSpec(NodeId.of("dev-1-config"), "test reason");
+        var node        = new DesiredNode(NodeId.of("review-dev-1-config"), NodeType.of("iot-review"), spec, io.casehub.desiredstate.api.HumanGating.ALL);
+        var result      = provisioner.provision(node, context());
+
+        assertThat(result).isInstanceOf(ProvisionResult.Success.class);
+    }
+
+    @Test
+    void reviewDeprovision_returnsSuccess() {
+        var provisioner = provisioner(null, new ArrayList<>(), CommandResult.SENT);
+        var spec        = new io.casehub.ops.api.iot.IoTReviewSpec(NodeId.of("dev-1-config"), "test reason");
+        var node        = new DesiredNode(NodeId.of("review-dev-1-config"), NodeType.of("iot-review"), spec, io.casehub.desiredstate.api.HumanGating.ALL);
+        var result      = provisioner.deprovision(node, deprovisionContext());
+
+        assertThat(result).isInstanceOf(DeprovisionResult.Success.class);
+    }
+
 
     private SwitchDevice switchDevice(String id, boolean on) {
         return SwitchDevice.builder()
