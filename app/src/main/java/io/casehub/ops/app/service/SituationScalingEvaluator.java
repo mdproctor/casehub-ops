@@ -120,7 +120,7 @@ public class SituationScalingEvaluator {
     private void evaluateForTenant(String tenancyId) {
         List<ActiveSituation> situations;
         try {
-            situations = situationSource.activeSituations(tenancyId).await().indefinitely();
+            situations = situationSource.activeSituations(tenancyId);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "Failed to query active situations for " + tenancyId, e);
             return;
