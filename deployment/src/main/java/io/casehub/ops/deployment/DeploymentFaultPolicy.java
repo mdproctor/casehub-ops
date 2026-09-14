@@ -5,6 +5,7 @@ import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.FaultEvent;
 import io.casehub.desiredstate.api.FaultPolicy;
 import io.casehub.desiredstate.api.FaultType;
+import io.casehub.desiredstate.api.DesiredNode;
 import io.casehub.desiredstate.api.GraphMutation;
 import io.casehub.desiredstate.api.NodeType;
 import io.casehub.desiredstate.api.ThresholdFaultPolicy;
@@ -33,7 +34,7 @@ public class DeploymentFaultPolicy implements FaultPolicy {
                                                                       .build();
 
     @Override
-    public List<GraphMutation> onFault(String tenancyId, FaultEvent event,
+    public List<GraphMutation<DesiredNode>> onFault(String tenancyId, FaultEvent event,
                                        DesiredStateGraph current, ActualState actualState) {
         return delegate.onFault(tenancyId, event, current, actualState);
     }
