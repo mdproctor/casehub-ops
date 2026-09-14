@@ -58,7 +58,7 @@ Four domains: infrastructure provisioning (Terraform/Ansible augmentation), Case
 
 ### Architectural Constraints
 
-- Single-domain deployment: one domain module per classpath. Multiple domain modules create CDI ambiguity (`@ApplicationScoped` GoalCompiler, ActualStateAdapter, etc. with no qualifiers). Each operational application deploys with exactly one domain module.
+- Multi-domain deployment: multiple domain modules may coexist on the same classpath. The desiredstate runtime routes `ActualStateAdapter` and `NodeProvisioner` calls by `NodeType` via `DefaultActualStateAdapterRouter` and `DefaultNodeProvisionerRouter`; `FaultPolicy` and `EventSource` implementations are collected and merged via `FaultPolicyEngine` and `DefaultMergedEventSource`. `GoalCompiler` ambiguity is resolved via `@DesiredStateQualifier` and `DomainRegistration`. Cross-domain dependency ordering is managed by `CrossDomainCompositionEngine` using `provides`/`requires` on `NodeType`. Domain modules must ensure their `handledTypes()` sets are disjoint — the routers throw on duplicate `NodeType` claims.
 - `api/` carries shared types across all domains. Domain-specific types live in the domain's api package (`io.casehub.ops.api.deployment`, `io.casehub.ops.api.infra`, `io.casehub.ops.api.compliance`).
 - `testing/` is test-scope only — never compile or runtime.
 - Human nodes generate casehub-work WorkItems, never blocking provisioner calls.
@@ -910,7 +910,7 @@ Nine-dimension operational model — a long-lived case with typed operational fa
 
 Sparse — most decisions are documented inline in the layer entries above. Cross-cutting decisions only:
 
-**Single-domain classpath constraint.** Each domain module provides unqualified `@ApplicationScoped` implementations of the desiredstate SPIs. CDI ambiguity prevents multiple domain modules on the same classpath. Qualifier-based multi-domain composition is possible but deferred — no use case exists yet. Each operational application deploys with exactly one domain module.
+**Cross-domain orchestration via flat graph merge.** Multiple domain modules' graphs are merged into a single `DesiredStateGraph` by `CrossDomainCompositionEngine`. Domain ordering is determined by `provides`/`requires` on `NodeType` — the engine computes a topological sort and adds cross-domain dependency edges connecting dependent domain roots to provider domain nodes of the required type. The engine supports both flattened composition (single merged graph in one `ReconciliationLoop`) and hierarchical mode (meta-graph with domain-level nodes). See casehubio/casehub-desiredstate#140 and casehubio/casehub-ops#23.
 
 **All design specs live in `docs/superpowers/specs/`.** Following the project artifact schema. One spec per major design decision, authored before implementation.
 
@@ -934,7 +934,7 @@ Sparse — most decisions are documented inline in the layer entries above. Cros
 | Risk | Impact | Mitigation |
 |---|---|---|
 | eidos API binary incompatibility | AgentCapability constructor changes break deployment module at runtime | Pin eidos version, test against latest in CI |
-| Single-domain constraint | Cannot compose infra + compliance on the same classpath | CDI qualifier-based dispatch if multi-domain needed |
+| Single-domain constraint | ~~Cannot compose infra + compliance on the same classpath~~ | Resolved — `CrossDomainCompositionEngine` (#140) enables multi-domain deployment with `provides`/`requires` ordering |
 
 ### Technical Debt
 

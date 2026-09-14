@@ -55,7 +55,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 - All reconciliation events flow through `EventSource.stream()` → ReconciliationLoop in the runtime
 - Pruning always before growing — dependency-aware ordering guaranteed by the runtime TransitionPlanner
 - tenancyId propagated through all calls — bind in repository/adapter layer only
-- `app/` implements the desiredstate SPI quad directly — NOT a domain module. No domain modules on the classpath (ARC42STORIES §2 single-domain CDI constraint)
+- `app/` implements the desiredstate SPI quad directly — NOT a domain module. Multiple domain modules may coexist on the classpath via `CrossDomainCompositionEngine` (desiredstate#140)
 
 ## Architecture Record
 
