@@ -46,7 +46,8 @@ class KubernetesFaultPolicyTest {
         assertThat(mutations).hasSize(2);
         assertThat(mutations.getFirst()).isInstanceOf(GraphMutation.AddNode.class);
 
-        var addNode = (GraphMutation.AddNode) mutations.getFirst();
+        @SuppressWarnings("unchecked")
+        var addNode = (GraphMutation.AddNode<DesiredNode>) mutations.getFirst();
         assertThat(addNode.node().id()).isEqualTo(NodeId.of("k8s-review-deploy-1"));
         assertThat(addNode.node().type()).isEqualTo(K8S_REVIEW);
         assertThat(addNode.node().humanGating()).isEqualTo(HumanGating.ALL);
@@ -56,10 +57,11 @@ class KubernetesFaultPolicyTest {
         assertThat(spec.faultedNode()).isEqualTo(NodeId.of("deploy-1"));
         assertThat(spec.reason()).isEqualTo("image pull failed");
 
-        assertThat(mutations.get(1)).isInstanceOf(GraphMutation.AddDependency.class);
-        var addDep = (GraphMutation.AddDependency) mutations.get(1);
-        assertThat(addDep.dependency().from()).isEqualTo(NodeId.of("k8s-review-deploy-1"));
-        assertThat(addDep.dependency().to()).isEqualTo(NodeId.of("deploy-1"));
+        assertThat(mutations.get(1)).isInstanceOf(GraphMutation.AddEdge.class);
+        @SuppressWarnings("unchecked")
+        var addDep = (GraphMutation.AddEdge<DesiredNode>) mutations.get(1);
+        assertThat(addDep.from()).isEqualTo("k8s-review-deploy-1");
+        assertThat(addDep.to()).isEqualTo("deploy-1");
     }
 
     @Test
