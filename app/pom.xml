@@ -162,6 +162,23 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.casehub</groupId>
+                            <artifactId>casehub-platform-graphql-generator</artifactId>
+                            <version>${casehub.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs>
+                        <arg>-AdomainFilter=ops/applications,ops/approvals,ops/cases,ops/clusters,ops/deployments,ops/reconciliation,ops/security,ops/services</arg>
+                        <arg>-AgenerateGraphQL=false</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

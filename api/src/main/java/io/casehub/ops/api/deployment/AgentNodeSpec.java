@@ -65,7 +65,7 @@ public record AgentNodeSpec(
                 weightsFingerprint, domainVocabulary, slotVocabulary,
                 dispositionVocabulary, styleVocabulary, axisVocabularies, slot, capabilities,
                 disposition, jurisdiction, dataHandlingPolicy, tenancyId, briefing,
-                List.of(), List.of(), List.of());}
+                List.of(), List.of(), List.of(), null);}
 
     public AgentNodeSpec withAgentId(String newId) {
         Objects.requireNonNull(newId, "newId");
