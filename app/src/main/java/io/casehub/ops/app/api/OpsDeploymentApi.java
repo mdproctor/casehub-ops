@@ -18,7 +18,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-@McpDomain(value = "ops/deployments", basePath = "/api/ops/deployments")
+@McpDomain(value = "ops/deployments", app = "ops", basePath = "/api/ops/deployments")
 @ApplicationScoped
 public class OpsDeploymentApi {
 

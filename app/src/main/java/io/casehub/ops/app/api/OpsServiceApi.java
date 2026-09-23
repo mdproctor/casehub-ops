@@ -18,7 +18,7 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.UUID;
 
-@McpDomain(value = "ops/services", basePath = "/api/ops/services")
+@McpDomain(value = "ops/services", app = "ops", basePath = "/api/ops/services")
 @ApplicationScoped
 public class OpsServiceApi {
 
