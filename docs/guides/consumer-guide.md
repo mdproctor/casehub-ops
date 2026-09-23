@@ -312,7 +312,7 @@ Quarkus application for K8s microservice lifecycle management. Embeds `casehub-e
 | `ClusterResource` | `/api/clusters` | CRUD for K8s cluster references |
 | `ScalingResource` | `/api/applications/{appId}/services/{serviceId}/scale` | POST -- manual or RAS-driven scaling with cooldown enforcement |
 | `ApprovalResource` | `/api/approvals` | GET (list/get), POST approve/reject with role-based authorization |
-| `ReconciliationResource` | Reconciliation status | Status queries |
+| `OpsReconciliationApi` | `/api/ops/reconciliation` | Status, trigger, `@PlatformStream` events |
 | `SecurityResource` | Security endpoints | Security operations |
 | `CaseResource` | Case management | Case operations |
 | `ServiceOperationResource` | Service operations | Service-level operations |
