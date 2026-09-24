@@ -11,7 +11,7 @@ import jakarta.inject.Inject;
 import java.util.List;
 import java.util.UUID;
 
-@McpDomain(value = "ops/cases", app = "ops", basePath = "/api/ops/cases")
+@McpDomain(value = "ops/cases", app = "ops", basePath = "/api/ops/cases", summary = "Ops case management — incidents, changes, problems")
 @ApplicationScoped
 public class OpsCaseApi {
 

@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@McpDomain(value = "ops/reconciliation", app = "ops", basePath = "/api/ops/reconciliation")
+@McpDomain(value = "ops/reconciliation", app = "ops", basePath = "/api/ops/reconciliation", summary = "Infrastructure reconciliation — drift detection and correction")
 @ApplicationScoped
 public class OpsReconciliationApi {
 

@@ -15,7 +15,7 @@ import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
 
-@McpDomain(value = "ops/applications", app = "ops", basePath = "/api/ops/applications")
+@McpDomain(value = "ops/applications", app = "ops", basePath = "/api/ops/applications", summary = "Application lifecycle — register, deploy, configure, retire")
 @ApplicationScoped
 public class OpsApplicationApi {
 

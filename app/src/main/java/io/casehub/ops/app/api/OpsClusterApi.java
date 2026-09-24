@@ -15,7 +15,7 @@ import jakarta.inject.Inject;
 import java.util.List;
 import java.util.UUID;
 
-@McpDomain(value = "ops/clusters", app = "ops", basePath = "/api/ops/clusters")
+@McpDomain(value = "ops/clusters", app = "ops", basePath = "/api/ops/clusters", summary = "Cluster management — health, scaling, configuration")
 @ApplicationScoped
 public class OpsClusterApi {
 

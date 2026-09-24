@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@McpDomain(value = "ops/approvals", app = "ops", basePath = "/api/ops/approvals")
+@McpDomain(value = "ops/approvals", app = "ops", basePath = "/api/ops/approvals", summary = "Deployment approval workflow — request, review, decide")
 @ApplicationScoped
 public class OpsApprovalApi {
 
