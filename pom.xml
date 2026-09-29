@@ -30,6 +30,7 @@
         <module>iot</module>
         <module>testing</module>
         <module>topology-tests</module>
+        <module>container</module>
         <module>examples/deployment-monitoring</module>
     </modules>
 

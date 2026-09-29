@@ -63,9 +63,11 @@ public record AgentNodeSpec(
         return new AgentDescriptor(
                 agentId, name, version, provider, modelFamily, modelVersion,
                 weightsFingerprint, domainVocabulary, slotVocabulary,
-                dispositionVocabulary, styleVocabulary, axisVocabularies, slot, capabilities,
-                disposition, jurisdiction, dataHandlingPolicy, tenancyId, briefing,
-                List.of(), List.of(), List.of(), null);}
+                dispositionVocabulary, styleVocabulary, axisVocabularies, slot,
+                null, List.of(), null,
+                capabilities, disposition, jurisdiction, dataHandlingPolicy,
+                tenancyId, briefing, null, List.of(), List.of(), List.of(), null);
+    }
 
     public AgentNodeSpec withAgentId(String newId) {
         Objects.requireNonNull(newId, "newId");

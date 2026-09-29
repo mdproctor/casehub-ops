@@ -73,6 +73,13 @@
             <artifactId>casehub-blocks-summarisation-yaml</artifactId>
         </dependency>
 
+        <!-- Ops domain modules -->
+        <dependency>
+            <groupId>io.casehub</groupId>
+            <artifactId>casehub-ops-container</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Quarkus -->
         <dependency>
             <groupId>io.quarkus</groupId>

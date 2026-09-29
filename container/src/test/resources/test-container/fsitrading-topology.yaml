@@ -1,0 +1,44 @@
+desiredState:
+  namespace: container
+  name: fsitrading
+
+variables:
+  app_image: casehub/fsitrading:latest
+  db_name: fsitrading_db
+  http_port: 18080
+
+nodes:
+  fsitrading-net:
+    type: container:network
+    spec:
+      name: fsitrading-net
+
+  fsitrading-db-data:
+    type: container:volume
+    spec:
+      name: fsitrading-db-data
+      driver: local
+
+  fsitrading-db:
+    type: container:database
+    dependsOn: [fsitrading-net, fsitrading-db-data]
+    spec:
+      name: fsitrading-db
+      databaseName: ${var.db_name}
+      username: fsitrading
+      password: fsitrading
+      dataVolume: fsitrading-db-data
+
+  fsitrading:
+    type: container:app
+    dependsOn: [fsitrading-db, fsitrading-net]
+    spec:
+      name: fsitrading
+      image: ${var.app_image}
+      ports:
+        8080: ${var.http_port}
+      env:
+        QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://fsitrading-db:5432/${var.db_name}
+        QUARKUS_DATASOURCE_USERNAME: fsitrading
+        QUARKUS_DATASOURCE_PASSWORD: fsitrading
+        QUARKUS_PROFILE: prod

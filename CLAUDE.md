@@ -38,6 +38,7 @@ mvn --batch-mode deploy -DskipTests   # CI only — requires GITHUB_TOKEN
 | `compliance/` | `casehub-ops-compliance` | `io.casehub.ops.compliance` | Compliance posture — SOC2/GDPR/EU-AI-Act/DORA/NIS2 |
 | `iot/` | `casehub-ops-iot` | `io.casehub.ops.iot` | IoT desired state — physical + logical node provisioning |
 | `testing/` | `casehub-ops-testing` | `io.casehub.ops.testing` | Shared test fixtures. **Test scope only.** |
+| `container/` | `casehub-ops-container` | `io.casehub.ops.container` | Container provisioning — Podman REST API for app containers, databases, networks, volumes |
 | `app/` | `casehub-ops-app` | `io.casehub.ops.app` | Operational console — Quarkus application embedding engine + desiredstate. NOT a domain module. |
 
 ## Domain Priority
