@@ -15,7 +15,11 @@ import io.casehub.ops.container.podman.PodmanClient;
 import io.casehub.ops.container.podman.PodmanContainer;
 import io.casehub.ops.container.podman.PodmanNetwork;
 import io.casehub.ops.container.podman.PodmanVolume;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.subscription.BackPressureStrategy;
+import io.smallrye.mutiny.subscription.MultiEmitter;
+import io.vertx.core.json.JsonObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -203,7 +207,7 @@ class ContainerReconciliationIntegrationTest {
         }
     }
 
-    static class SimulatingPodmanClient extends PodmanClient {
+    public static class SimulatingPodmanClient extends PodmanClient {
 
         final ConcurrentHashMap<String, SimContainer> containers = new ConcurrentHashMap<>();
         final ConcurrentHashMap<String, PodmanNetwork> networks = new ConcurrentHashMap<>();
@@ -290,6 +294,21 @@ class ContainerReconciliationIntegrationTest {
             if (c != null) {
                 containers.put(name, c.withState("exited"));
             }
+        }
+
+        private volatile MultiEmitter<? super JsonObject> eventEmitter;
+        private final Multi<JsonObject> eventStream = Multi.createFrom()
+            .<JsonObject>emitter(e -> this.eventEmitter = e, BackPressureStrategy.BUFFER)
+            .broadcast().toAllSubscribers();
+
+        @Override
+        public Multi<JsonObject> events(String type) {
+            return eventStream;
+        }
+
+        void emitEvent(JsonObject event) {
+            var e = this.eventEmitter;
+            if (e != null) e.emit(event);
         }
 
         record SimContainer(String id, String name, String state, String image) {

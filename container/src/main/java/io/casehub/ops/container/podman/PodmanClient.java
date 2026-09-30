@@ -1,6 +1,11 @@
 package io.casehub.ops.container.podman;
 
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.subscription.BackPressureStrategy;
+import io.vertx.core.parsetools.JsonEventType;
+import io.vertx.core.parsetools.JsonParser;
+import io.vertx.ext.web.codec.BodyCodec;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonArray;
@@ -150,6 +155,27 @@ public class PodmanClient {
 
     public Uni<Void> pullImage(String image) {
         return toUni(post("/images/pull").addQueryParam("reference", image).send()).replaceWithVoid();
+    }
+
+    public Multi<JsonObject> events(String type) {
+        return Multi.createFrom().<JsonObject>emitter(emitter -> {
+            JsonParser parser = JsonParser.newParser()
+                .objectValueMode()
+                .handler(event -> {
+                    if (event.type() == JsonEventType.VALUE) {
+                        emitter.emit(event.objectValue());
+                    }
+                })
+                .exceptionHandler(emitter::fail);
+
+            webClient.request(HttpMethod.GET, socketAddress, 80, "localhost",
+                    API_VERSION + "/events")
+                .addQueryParam("stream", "true")
+                .addQueryParam("type", type)
+                .as(BodyCodec.jsonStream(parser))
+                .send()
+                .onFailure(emitter::fail);
+        }, BackPressureStrategy.BUFFER);
     }
 
     private static <T> Uni<T> toUni(io.vertx.core.Future<T> future) {
