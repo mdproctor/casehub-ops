@@ -7,6 +7,7 @@ import io.casehub.desiredstate.api.DesiredStateGraph;
 import io.casehub.desiredstate.api.DesiredStateGraphFactory;
 import io.casehub.desiredstate.api.NodeId;
 import io.casehub.desiredstate.api.SituationRecompiler;
+import io.casehub.ops.api.deployment.AdaptationSnapshotProvider;
 import io.casehub.ops.api.deployment.DeploymentGoals;
 import io.casehub.ops.deployment.DeploymentGoalCompiler;
 import io.casehub.ras.api.ActiveSituation;
@@ -25,10 +26,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 @ApplicationScoped
-public class DeploymentAdaptiveSituationRecompiler implements SituationRecompiler {
+public class DeploymentAdaptiveSituationRecompiler implements SituationRecompiler, AdaptationSnapshotProvider {
 
-    private static final Logger LOG = Logger.getLogger(
-        DeploymentAdaptiveSituationRecompiler.class.getName());
+    private static final Logger                                                             LOG                = Logger.getLogger(
+            DeploymentAdaptiveSituationRecompiler.class.getName());
     static final         Map<String, Class<? extends io.casehub.desiredstate.api.NodeSpec>> NODE_TYPE_REGISTRY = Map.of(
             "agent", io.casehub.ops.api.deployment.AgentNodeSpec.class,
             "channel", io.casehub.ops.api.deployment.ChannelNodeSpec.class,
@@ -40,12 +41,15 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
                                                                                                                        );
 
 
-    @Inject DeploymentGoalCompiler compiler;
-    @Inject ObjectMapper mapper;
-    @Inject MeterRegistry meterRegistry;
+    @Inject
+    DeploymentGoalCompiler compiler;
+    @Inject
+    ObjectMapper           mapper;
+    @Inject
+    MeterRegistry          meterRegistry;
 
     private final ConcurrentHashMap<String, TenantAdaptationState> tenantStates =
-        new ConcurrentHashMap<>();
+            new ConcurrentHashMap<>();
 
     @Override
     public int priority() {
@@ -56,7 +60,7 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
                          Map<String, Duration> situationClearanceWindows,
                          DesiredStateGraphFactory factory) {
         List<AdaptationRule> rules = AdaptationRule.fromSpecs(
-            goals.adaptations(), compiler, mapper, factory, NODE_TYPE_REGISTRY);
+                goals.adaptations(), compiler, mapper, factory, NODE_TYPE_REGISTRY);
         var state = new TenantAdaptationState(goals, rules, situationClearanceWindows);
         tenantStates.put(tenancyId, state);
     }
@@ -77,10 +81,10 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
         synchronized (state) {
             state.updateSituation(situation);
 
-            CompilationResult baseResult = compiler.compile(state.goals(), factory);
-            DesiredStateGraph base = ((CompilationResult.SingleGraph) baseResult).graph();
-            DesiredStateGraph adapted = base;
-            Set<NodeId> modifiedNodes = new HashSet<>();
+            CompilationResult baseResult    = compiler.compile(state.goals(), factory);
+            DesiredStateGraph base          = ((CompilationResult.SingleGraph) baseResult).graph();
+            DesiredStateGraph adapted       = base;
+            Set<NodeId>       modifiedNodes = new HashSet<>();
 
             for (AdaptationRule rule : state.rules()) {
                 Optional<ActiveSituation> match = state.activeSituationFor(rule);
@@ -89,12 +93,12 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
                     for (NodeId t : targets) {
                         if (modifiedNodes.contains(t)) {
                             LOG.warning(String.format(
-                                "Conflict: rule '%s' modifies '%s' "
+                                    "Conflict: rule '%s' modifies '%s' "
                                     + "already modified by earlier rule",
-                                rule.name(), t.value()));
+                                    rule.name(), t.value()));
                             meterRegistry.counter("desiredstate.adaptation.conflict.total",
-                                Tags.of("tenancy_id", tenancyId, "rule_name", rule.name(), "node_id", t.value()))
-                                .increment();
+                                                  Tags.of("tenancy_id", tenancyId, "rule_name", rule.name(), "node_id", t.value()))
+                                         .increment();
                         }
                     }
                     adapted = rule.apply(adapted, match.get());
@@ -131,8 +135,8 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
             }
 
             CompilationResult baseResult = compiler.compile(state.goals(), factory);
-            DesiredStateGraph base = ((CompilationResult.SingleGraph) baseResult).graph();
-            DesiredStateGraph adapted = base;
+            DesiredStateGraph base       = ((CompilationResult.SingleGraph) baseResult).graph();
+            DesiredStateGraph adapted    = base;
 
             for (AdaptationRule rule : state.rules()) {
                 Optional<ActiveSituation> match = state.activeSituationFor(rule);
@@ -148,9 +152,36 @@ public class DeploymentAdaptiveSituationRecompiler implements SituationRecompile
         }
     }
 
+    @Override
+    public AdaptationSnapshot getAdaptationSnapshot(String tenancyId) {
+        TenantAdaptationState state = tenantStates.get(tenancyId);
+        if (state == null) {
+            return new AdaptationSnapshot(List.of(), List.of());
+        }
+
+        synchronized (state) {
+            List<AdaptationSnapshotProvider.ActiveRuleInfo> ruleInfos =
+                    state.rules().stream()
+                         .map(rule -> new AdaptationSnapshotProvider.ActiveRuleInfo(
+                                 rule.name(),
+                                 rule.trigger().situation(),
+                                 state.isRuleActive(rule.name())))
+                         .toList();
+
+            List<AdaptationSnapshotProvider.TrackedSituationInfo> sitInfos =
+                    state.trackedSituationSnapshot().stream()
+                         .map(sit -> new AdaptationSnapshotProvider.TrackedSituationInfo(
+                                 sit.situationId(), sit.confidence(),
+                                 sit.since(), sit.lastSignal()))
+                         .toList();
+
+            return new AdaptationSnapshot(ruleInfos, sitInfos);
+        }
+    }
+
     private static boolean graphsEqual(DesiredStateGraph a, DesiredStateGraph b) {
-        if (a == b) return true;
-        if (a == null || b == null) return false;
+        if (a == b) {return true;}
+        if (a == null || b == null) {return false;}
         return a.nodes().equals(b.nodes()) && a.dependencies().equals(b.dependencies());
     }
 }

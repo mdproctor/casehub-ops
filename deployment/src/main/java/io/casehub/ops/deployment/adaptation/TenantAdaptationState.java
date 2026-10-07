@@ -1,7 +1,7 @@
 package io.casehub.ops.deployment.adaptation;
 
-import io.casehub.ras.api.ActiveSituation;
 import io.casehub.ops.api.deployment.DeploymentGoals;
+import io.casehub.ras.api.ActiveSituation;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -90,6 +90,16 @@ final class TenantAdaptationState {
 
         return shouldBeActive;
     }
+
+
+    boolean isRuleActive(String ruleName) {
+        return activePerRule.getOrDefault(ruleName, false);
+    }
+
+    List<ActiveSituation> trackedSituationSnapshot() {
+        return List.copyOf(trackedSituations.values());
+    }
+
 
     void clearAbsentSituations() {
         Instant now = Instant.now();
